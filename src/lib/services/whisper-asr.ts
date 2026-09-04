@@ -36,6 +36,27 @@ interface WhisperResult {
 
 let pipelinePromise: Promise<AutomaticSpeechRecognitionPipeline> | null = null;
 
+// Dispose the cached ONNX pipeline and clear the singleton reference so the
+// model's memory can be reclaimed before the next heavy model is loaded.
+// Render's free tier caps at 512 MB — holding Whisper (~400 MB) and NLLB
+// (~600 MB) simultaneously causes OOM kills, so process-call.ts loads them
+// one at a time and releases each after use.
+async function releasePipeline(): Promise<void> {
+  const cached = pipelinePromise;
+  pipelinePromise = null;
+  if (cached) {
+    try {
+      const pipeline = await cached;
+      const disposable = pipeline as unknown as { dispose?: () => Promise<void> | void };
+      if (typeof disposable.dispose === 'function') {
+        await disposable.dispose();
+      }
+    } catch {
+      // Already failed to load — nothing to dispose.
+    }
+  }
+}
+
 function getModelName(): string {
   // Easy to swap for tiny/base/medium from .env without code changes.
   return process.env.WHISPER_MODEL || DEFAULT_MODEL;
@@ -210,6 +231,8 @@ function estimateConfidence(
   return Math.round(Math.min(speechSeconds / audioSeconds, 1) * 100) / 100;
 }
 
+export { releasePipeline as _releaseWhisperPipeline };
+
 export class WhisperASRService implements ASRService {
   async transcribe(input: ASRInput): Promise<ASROutput> {
     const transcriber = await getPipeline();
@@ -242,5 +265,11 @@ export class WhisperASRService implements ASRService {
       language_detected: detectLanguage(input.language_hint, transcript),
       confidence: estimateConfidence(result, transcript, audio.length),
     };
+  }
+
+  // Dispose the Whisper ONNX session so its memory is freed before the next
+  // heavy model (NLLB) is loaded — critical for 512 MB deployments.
+  async release(): Promise<void> {
+    await releasePipeline();
   }
 }

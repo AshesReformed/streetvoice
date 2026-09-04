@@ -12,6 +12,9 @@ export interface ASROutput {
 
 export interface ASRService {
   transcribe(input: ASRInput): Promise<ASROutput>;
+  // Dispose the underlying model and free memory. Optional so that lightweight
+  // or mock implementations that hold no heavy resources can omit it.
+  release?(): Promise<void>;
 }
 
 // Translation Service
@@ -27,6 +30,9 @@ export interface TranslationOutput {
 
 export interface TranslationService {
   translate(input: TranslationInput): Promise<TranslationOutput>;
+  // Dispose the underlying model and free memory. Optional so that lightweight
+  // or mock implementations that hold no heavy resources can omit it.
+  release?(): Promise<void>;
 }
 
 // Classification Service

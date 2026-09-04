@@ -7,20 +7,31 @@ export async function processIncomingCall(
   payload: TelephonyWebhookInput
 ): Promise<TelephonyWebhookOutput> {
   const supabase = createAdminClient();
-  const asrService = getASRService();
-  const translationService = getTranslationService();
 
-  // 1. ASR: transcribe audio
+  // ── Sequential model loading ──────────────────────────────────────────
+  // Whisper and NLLB are each several hundred MB in memory. Render's free
+  // tier caps at 512 MB, so loading both at once causes OOM kills. Each
+  // model is loaded on demand, used, then explicitly disposed (via
+  // release()) before the next one is loaded. This trades a few seconds
+  // of extra latency per call for a dramatically lower peak memory
+  // footprint — only one model is ever resident at a time.
+  // ───────────────────────────────────────────────────────────────────────
+
+  // 1. ASR: load Whisper, transcribe audio, then release the model.
+  const asrService = getASRService();
   const asrResult = await asrService.transcribe({
     audio_url: payload.audio_url,
     language_hint: payload.dtmf_language,
   });
+  await asrService.release?.();
 
-  // 2. Translation: translate to urdu + english
+  // 2. Translation: load NLLB, translate to Urdu + English, then release.
+  const translationService = getTranslationService();
   const translationResult = await translationService.translate({
     text: asrResult.transcript,
     source_lang: asrResult.language_detected,
   });
+  await translationService.release?.();
 
   // 3. Fetch departments for classification
   const { data: departments } = await supabase.from('departments').select('id, name, keywords');

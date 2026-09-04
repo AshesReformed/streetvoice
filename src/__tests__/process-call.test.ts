@@ -27,6 +27,8 @@ const mockGetClassificationService = vi.mocked(getClassificationService);
 const transcribeSpy = vi.fn();
 const translateSpy = vi.fn();
 const classifySpy = vi.fn();
+const asrReleaseSpy = vi.fn();
+const translationReleaseSpy = vi.fn();
 
 function stubPipelineDependencies() {
   transcribeSpy.mockResolvedValue({
@@ -44,8 +46,8 @@ function stubPipelineDependencies() {
     confidence: 0,
   });
 
-  mockGetASRService.mockReturnValue({ transcribe: transcribeSpy });
-  mockGetTranslationService.mockReturnValue({ translate: translateSpy });
+  mockGetASRService.mockReturnValue({ transcribe: transcribeSpy, release: asrReleaseSpy });
+  mockGetTranslationService.mockReturnValue({ translate: translateSpy, release: translationReleaseSpy });
   mockGetClassificationService.mockReturnValue({ classify: classifySpy });
 
   // Minimal Supabase stand-in: departments read, complaint insert chain, and
@@ -114,5 +116,24 @@ describe('processIncomingCall', () => {
 
     expect(result.tracking_id).toBe('SV-000001');
     expect(result.spoken_confirmation_text).toContain('SV-000001');
+  });
+
+  it('releases each model after use so only one is in memory at a time', async () => {
+    await processIncomingCall({
+      call_ref: 'call-4',
+      audio_url: 'https://telephony.example.com/calls/call-4.wav',
+    });
+
+    // Whisper must be disposed before NLLB is loaded — critical on 512 MB
+    // deployments where both models held simultaneously cause OOM kills.
+    expect(asrReleaseSpy).toHaveBeenCalledTimes(1);
+    expect(translationReleaseSpy).toHaveBeenCalledTimes(1);
+
+    // ASR release must happen before translation starts.
+    const asrReleaseOrder = asrReleaseSpy.mock.invocationCallOrder[0];
+    const translateOrder = translateSpy.mock.invocationCallOrder[0];
+    const translationReleaseOrder = translationReleaseSpy.mock.invocationCallOrder[0];
+    expect(asrReleaseOrder).toBeLessThan(translateOrder);
+    expect(translateOrder).toBeLessThan(translationReleaseOrder);
   });
 });

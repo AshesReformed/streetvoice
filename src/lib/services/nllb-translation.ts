@@ -69,6 +69,29 @@ type TranslationPipelineFn = (
 let pipelinePromise: Promise<TranslationPipelineFn> | null = null;
 
 /**
+ * Dispose the cached ONNX pipeline and clear the singleton reference so the
+ * model's memory can be reclaimed before the next heavy model is loaded.
+ * Render's free tier caps at 512 MB — holding Whisper (~400 MB) and NLLB
+ * (~600 MB) simultaneously causes OOM kills, so process-call.ts loads them
+ * one at a time and releases each after use.
+ */
+async function releasePipeline(): Promise<void> {
+  const cached = pipelinePromise;
+  pipelinePromise = null;
+  if (cached) {
+    try {
+      const pipeline = await cached;
+      const disposable = pipeline as unknown as { dispose?: () => Promise<void> | void };
+      if (typeof disposable.dispose === 'function') {
+        await disposable.dispose();
+      }
+    } catch {
+      // Already failed to load — nothing to dispose.
+    }
+  }
+}
+
+/**
  * Reset the cached pipeline singleton. Exported for tests only — allows
  * each test to verify first-use behaviour (download logging, env-var reading,
  * error recovery) in isolation.
@@ -163,5 +186,11 @@ export class NllbTranslationService implements TranslationService {
     }
 
     return { urdu, english };
+  }
+
+  // Dispose the NLLB ONNX session so its memory is freed after translation
+  // completes — critical for 512 MB deployments that can't hold both models.
+  async release(): Promise<void> {
+    await releasePipeline();
   }
 }
