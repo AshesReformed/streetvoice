@@ -39,9 +39,6 @@ interface SimulatedCallResult {
   department_name: string | null
 }
 
-// Test-call simulation is dev-only; hidden from production builds.
-const isDev = process.env.NODE_ENV !== 'production'
-
 // Language hint sent with a simulated call. An explicit choice mirrors a
 // real caller's DTMF selection; 'unspecified' lets the ASR auto-detect from
 // the recording itself.
@@ -52,7 +49,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Dev-only test call simulation
+  // Test call simulation (admin-only)
   const [simulating, setSimulating] = useState(false)
   const [simulated, setSimulated] = useState<SimulatedCallResult | null>(null)
   const [simulateError, setSimulateError] = useState<string | null>(null)
@@ -155,42 +152,40 @@ export default function AdminDashboard() {
   return (
     <div className="space-y-6">
       <PageHeader title="Dashboard" description="Overview of all complaints across departments">
-        {isDev && (
-          <>
-            <Input
-              className="h-7 w-72"
-              placeholder="Custom audio URL (optional)"
-              aria-label="Custom audio URL for simulated test call"
-              value={customAudioUrl}
-              onChange={(e) => setCustomAudioUrl(e.target.value)}
+        <>
+          <Input
+            className="h-7 w-72"
+            placeholder="Custom audio URL (optional)"
+            aria-label="Custom audio URL for simulated test call"
+            value={customAudioUrl}
+            onChange={(e) => setCustomAudioUrl(e.target.value)}
+            disabled={simulating}
+          />
+          <Select
+            value={simulateLanguage}
+            onValueChange={(v: string | null) =>
+              setSimulateLanguage(v === 'ur' || v === 'en' ? v : 'unspecified')
+            }
+          >
+            <SelectTrigger
+              size="sm"
+              className="w-44"
+              aria-label="Language hint for simulated test call"
               disabled={simulating}
-            />
-            <Select
-              value={simulateLanguage}
-              onValueChange={(v: string | null) =>
-                setSimulateLanguage(v === 'ur' || v === 'en' ? v : 'unspecified')
-              }
             >
-              <SelectTrigger
-                size="sm"
-                className="w-44"
-                aria-label="Language hint for simulated test call"
-                disabled={simulating}
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="unspecified">Auto-detect language</SelectItem>
-                <SelectItem value="ur">Urdu (ur)</SelectItem>
-                <SelectItem value="en">English (en)</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button variant="outline" size="sm" onClick={handleSimulateCall} disabled={simulating}>
-              <PhoneCall size={14} />
-              {simulating ? 'Simulating...' : 'Simulate a test call'}
-            </Button>
-          </>
-        )}
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="unspecified">Auto-detect language</SelectItem>
+              <SelectItem value="ur">Urdu (ur)</SelectItem>
+              <SelectItem value="en">English (en)</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button variant="outline" size="sm" onClick={handleSimulateCall} disabled={simulating}>
+            <PhoneCall size={14} />
+            {simulating ? 'Simulating...' : 'Simulate a test call'}
+          </Button>
+        </>
       </PageHeader>
 
       {simulated && (

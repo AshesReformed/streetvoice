@@ -27,11 +27,6 @@ function pick<T>(items: T[]): T {
 }
 
 export async function POST(request: NextRequest) {
-  // Never available in production builds
-  if (process.env.NODE_ENV === 'production') {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  }
-
   try {
     const auth = await requireAuth(request);
     if (auth instanceof NextResponse) return auth;

@@ -69,7 +69,7 @@ function adminUser() {
   };
 }
 
-describe('Simulate Call Endpoint (dev-only)', () => {
+describe('Simulate Call Endpoint (admin-only)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -78,13 +78,37 @@ describe('Simulate Call Endpoint (dev-only)', () => {
     vi.unstubAllEnvs();
   });
 
-  it('returns 404 in production and never touches the pipeline', async () => {
+  it('works in production when the user is an admin', async () => {
     vi.stubEnv('NODE_ENV', 'production');
+    mockRequireAuth.mockResolvedValue(adminUser());
+    mockProcessIncomingCall.mockResolvedValue({
+      tracking_id: 'SV-000042',
+      spoken_confirmation_text: 'Your complaint has been registered.',
+    });
+    stubComplaintLookup();
 
     const res = await POST(makeRequest());
 
-    expect(res.status).toBe(404);
-    expect(mockRequireAuth).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+    expect(mockProcessIncomingCall).toHaveBeenCalledTimes(1);
+  });
+
+  it('still blocks non-admin users in production', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    mockRequireAuth.mockResolvedValue({
+      id: 'user-2',
+      email: 'officer@test.pk',
+      officer: {
+        id: 'user-2',
+        department_id: null,
+        role: 'officer',
+        full_name: 'Test Officer',
+      },
+    });
+
+    const res = await POST(makeRequest());
+
+    expect(res.status).toBe(403);
     expect(mockProcessIncomingCall).not.toHaveBeenCalled();
   });
 
