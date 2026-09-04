@@ -5,15 +5,14 @@ import { processIncomingCall } from '@/lib/pipeline/process-call';
 import { webhookPayloadSchema } from '@/lib/validation/schemas';
 import { SAMPLE_SCENARIOS } from '@/lib/services/mock-asr';
 
-// Dev-only endpoint that simulates an incoming phone call by pushing a fake
+// Admin-only endpoint that simulates an incoming phone call by pushing a fake
 // payload through the real call pipeline (ASR -> translation ->
 // classification -> complaint). Lets the dashboard fill up with realistic
 // test data without any telephony provider. Accepts an optional
 // { audioUrl } body to send a real recording through the pipeline instead of
 // a canned sample, and an optional { language: 'ur' | 'en' } to force the
 // DTMF language hint — a recording without one is auto-detected by the ASR
-// instead of being forced into a random language. Always returns 404 in
-// production.
+// instead of being forced into a random language. Gated by admin auth only.
 
 const FAKE_CALLERS = [
   '+923001234567',
