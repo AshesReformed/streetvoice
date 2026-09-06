@@ -38,6 +38,7 @@ const WHISPER_TO_FLORES: Record<string, string> = {
   pa: 'pan_Guru', // Punjabi (Shahmukhi/Gurmukhi)
   ps: 'pus_Arab', // Pashto
   sd: 'snd_Arab', // Sindhi
+  skr: 'skr_Arab', // Saraiki (DTMF option 5 on the Twilio voice menu)
 };
 
 /**

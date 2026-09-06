@@ -63,6 +63,12 @@ describe('toFloresCode language mapping', () => {
     expect(toFloresCode('sd')).toBe('snd_Arab');
   });
 
+  it('maps Saraiki (skr) to skr_Arab', () => {
+    // Saraiki is DTMF option 5 on the Twilio voice menu — without this
+    // mapping the pipeline's translation pass would fall back to Urdu.
+    expect(toFloresCode('skr')).toBe('skr_Arab');
+  });
+
   it('is case-insensitive', () => {
     expect(toFloresCode('UR')).toBe('urd_Arab');
     expect(toFloresCode('En')).toBe('eng_Latn');
