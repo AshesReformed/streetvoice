@@ -50,6 +50,43 @@ export interface ClassificationService {
   classify(input: ClassificationInput): Promise<ClassificationOutput>;
 }
 
+// Complaint analyzer: one recording in, everything the pipeline stores out.
+// Implementations either call a multimodal model once (Gemini) or chain the
+// ASR → translation → classification services above (staged).
+export interface AnalyzerDepartment {
+  id: string;
+  name: string;
+  keywords: string[];
+  description?: string | null;
+}
+
+export interface ComplaintAnalysisInput {
+  audio_url: string;
+  language_hint?: string;
+  departments: AnalyzerDepartment[];
+}
+
+export type Urgency = 'low' | 'medium' | 'high';
+
+export interface ComplaintAnalysis {
+  language: string; // ISO 639 code of what the caller actually spoke
+  transcript_original: string;
+  transcript_urdu: string;
+  transcript_english: string;
+  summary: string; // one line, English
+  department_id: string | null;
+  category: string; // department name, or 'unclassified'
+  area: string | null; // locality / landmark mentioned by the caller
+  urgency: Urgency;
+  confidence: number; // 0..1, how sure the analyzer is of the routing
+  needs_review: boolean;
+  review_reason: string | null;
+}
+
+export interface ComplaintAnalyzer {
+  analyze(input: ComplaintAnalysisInput): Promise<ComplaintAnalysis>;
+}
+
 // Telephony webhook input/output
 export interface TelephonyWebhookInput {
   call_ref: string;

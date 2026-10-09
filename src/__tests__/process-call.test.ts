@@ -1,73 +1,70 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { ComplaintAnalysis } from '@/lib/services/types';
 
-// The pipeline tests only care about how services are invoked — stub the
-// service factory and Supabase so no real provider or database is touched.
+// The pipeline tests only care about how the analyzer is invoked and what
+// gets stored — stub the analyzer factory and Supabase so no real provider
+// or database is touched.
 vi.mock('@/lib/supabase/admin', () => ({
   createAdminClient: vi.fn(),
 }));
 vi.mock('@/lib/services', () => ({
-  getASRService: vi.fn(),
-  getTranslationService: vi.fn(),
-  getClassificationService: vi.fn(),
+  getComplaintAnalyzer: vi.fn(),
 }));
 
 import { processIncomingCall } from '@/lib/pipeline/process-call';
 import { createAdminClient } from '@/lib/supabase/admin';
-import {
-  getASRService,
-  getTranslationService,
-  getClassificationService,
-} from '@/lib/services';
+import { getComplaintAnalyzer } from '@/lib/services';
 
 const mockCreateAdminClient = vi.mocked(createAdminClient);
-const mockGetASRService = vi.mocked(getASRService);
-const mockGetTranslationService = vi.mocked(getTranslationService);
-const mockGetClassificationService = vi.mocked(getClassificationService);
+const mockGetComplaintAnalyzer = vi.mocked(getComplaintAnalyzer);
 
-const transcribeSpy = vi.fn();
-const translateSpy = vi.fn();
-const classifySpy = vi.fn();
-const asrReleaseSpy = vi.fn();
-const translationReleaseSpy = vi.fn();
+const analyzeSpy = vi.fn();
+const complaintInsertSpy = vi.fn();
 
-function stubPipelineDependencies() {
-  transcribeSpy.mockResolvedValue({
-    transcript: 'گلی میں پانی نہیں ہے',
-    language_detected: 'ur',
-    confidence: 0.9,
-  });
-  translateSpy.mockResolvedValue({
-    urdu: 'گلی میں پانی نہیں ہے',
-    english: 'There is no water in the street.',
-  });
-  classifySpy.mockResolvedValue({
-    department_id: null,
-    category: 'unclassified',
-    confidence: 0,
-  });
+const DEPARTMENTS = [
+  { id: 'dept-electricity', name: 'Electricity', keywords: ['power'], description: 'Outages' },
+];
 
-  mockGetASRService.mockReturnValue({ transcribe: transcribeSpy, release: asrReleaseSpy });
-  mockGetTranslationService.mockReturnValue({ translate: translateSpy, release: translationReleaseSpy });
-  mockGetClassificationService.mockReturnValue({ classify: classifySpy });
+function analysis(overrides: Partial<ComplaintAnalysis> = {}): ComplaintAnalysis {
+  return {
+    language: 'pa',
+    transcript_original: 'ساڈے محلے وچ ٹرانسفارمر سڑ گیا اے',
+    transcript_urdu: 'ہمارے محلے میں ٹرانسفارمر جل گیا ہے',
+    transcript_english: 'The transformer in our neighbourhood has burnt out.',
+    summary: 'Transformer burnt out in Model Town.',
+    department_id: 'dept-electricity',
+    category: 'Electricity',
+    area: 'Model Town',
+    urgency: 'high',
+    confidence: 0.92,
+    needs_review: false,
+    review_reason: null,
+    ...overrides,
+  };
+}
+
+function stubPipelineDependencies(result: ComplaintAnalysis) {
+  analyzeSpy.mockResolvedValue(result);
+  mockGetComplaintAnalyzer.mockReturnValue({ analyze: analyzeSpy });
 
   // Minimal Supabase stand-in: departments read, complaint insert chain, and
   // the fire-and-forget call_logs / status_history inserts. No caller_id is
   // supplied, so the citizen upsert path is never reached.
-  const complaintInsert = {
+  complaintInsertSpy.mockReturnValue({
     select: vi.fn().mockReturnValue({
       single: vi.fn().mockResolvedValue({
         data: { id: 'complaint-1', tracking_id: 'SV-000001' },
         error: null,
       }),
     }),
-  };
+  });
   mockCreateAdminClient.mockReturnValue({
     from: vi.fn((table: string) => {
       if (table === 'departments') {
-        return { select: vi.fn().mockResolvedValue({ data: [], error: null }) };
+        return { select: vi.fn().mockResolvedValue({ data: DEPARTMENTS, error: null }) };
       }
       if (table === 'complaints') {
-        return { insert: vi.fn().mockReturnValue(complaintInsert) };
+        return { insert: complaintInsertSpy };
       }
       return { insert: vi.fn().mockResolvedValue({ error: null }) };
     }),
@@ -77,21 +74,20 @@ function stubPipelineDependencies() {
 describe('processIncomingCall', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    stubPipelineDependencies();
+    stubPipelineDependencies(analysis());
   });
 
-  it('forwards the DTMF language selection to the ASR service as a hint', async () => {
+  it('passes the recording, DTMF language and departments to the analyzer', async () => {
     await processIncomingCall({
       call_ref: 'call-1',
       audio_url: 'https://telephony.example.com/calls/call-1.wav',
-      dtmf_language: 'ur',
+      dtmf_language: 'pa',
     });
 
-    // Without this pass-through, Whisper is forced into the wrong language
-    // for real recordings (e.g. Urdu audio decoded as English).
-    expect(transcribeSpy).toHaveBeenCalledWith({
+    expect(analyzeSpy).toHaveBeenCalledWith({
       audio_url: 'https://telephony.example.com/calls/call-1.wav',
-      language_hint: 'ur',
+      language_hint: 'pa',
+      departments: DEPARTMENTS,
     });
   });
 
@@ -101,39 +97,59 @@ describe('processIncomingCall', () => {
       audio_url: 'https://telephony.example.com/calls/call-2.wav',
     });
 
-    expect(transcribeSpy).toHaveBeenCalledWith({
-      audio_url: 'https://telephony.example.com/calls/call-2.wav',
-      language_hint: undefined,
-    });
+    expect(analyzeSpy.mock.calls[0][0].language_hint).toBeUndefined();
   });
 
-  it('returns the stored tracking id with the spoken confirmation', async () => {
-    const result = await processIncomingCall({
+  it('stores the analysis and routes a confident complaint as open', async () => {
+    await processIncomingCall({
       call_ref: 'call-3',
       audio_url: 'https://telephony.example.com/calls/call-3.wav',
-      dtmf_language: 'en',
     });
 
-    expect(result.tracking_id).toBe('SV-000001');
-    expect(result.spoken_confirmation_text).toContain('SV-000001');
+    expect(complaintInsertSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'open',
+        department_id: 'dept-electricity',
+        category: 'Electricity',
+        transcript_regional: 'ساڈے محلے وچ ٹرانسفارمر سڑ گیا اے',
+        transcript_english: 'The transformer in our neighbourhood has burnt out.',
+        summary: 'Transformer burnt out in Model Town.',
+        language: 'pa',
+        area: 'Model Town',
+        priority: 'high',
+        confidence_score: 0.92,
+        review_reason: null,
+      })
+    );
   });
 
-  it('releases each model after use so only one is in memory at a time', async () => {
+  it('holds a complaint for review without a department when the analyzer is unsure', async () => {
+    stubPipelineDependencies(
+      analysis({ needs_review: true, confidence: 0.3, review_reason: 'Speech was unclear' })
+    );
+
     await processIncomingCall({
       call_ref: 'call-4',
       audio_url: 'https://telephony.example.com/calls/call-4.wav',
     });
 
-    // Whisper must be disposed before NLLB is loaded — critical on 512 MB
-    // deployments where both models held simultaneously cause OOM kills.
-    expect(asrReleaseSpy).toHaveBeenCalledTimes(1);
-    expect(translationReleaseSpy).toHaveBeenCalledTimes(1);
+    expect(complaintInsertSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'needs_review',
+        department_id: null,
+        review_reason: 'Speech was unclear',
+      })
+    );
+  });
 
-    // ASR release must happen before translation starts.
-    const asrReleaseOrder = asrReleaseSpy.mock.invocationCallOrder[0];
-    const translateOrder = translateSpy.mock.invocationCallOrder[0];
-    const translationReleaseOrder = translationReleaseSpy.mock.invocationCallOrder[0];
-    expect(asrReleaseOrder).toBeLessThan(translateOrder);
-    expect(translateOrder).toBeLessThan(translationReleaseOrder);
+  it('returns the stored tracking id with the spoken confirmation', async () => {
+    const result = await processIncomingCall({
+      call_ref: 'call-5',
+      audio_url: 'https://telephony.example.com/calls/call-5.wav',
+      dtmf_language: 'en',
+    });
+
+    expect(result.tracking_id).toBe('SV-000001');
+    expect(result.spoken_confirmation_text).toContain('SV-000001');
   });
 });

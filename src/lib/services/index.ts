@@ -1,4 +1,6 @@
-import { ASRService, TranslationService, ClassificationService } from './types';
+import { ASRService, TranslationService, ClassificationService, ComplaintAnalyzer } from './types';
+import { GeminiComplaintAnalyzer } from './gemini-analyzer';
+import { StagedComplaintAnalyzer } from './staged-analyzer';
 import { MockASRService } from './mock-asr';
 import { WhisperASRService } from './whisper-asr';
 import { MockTranslationService } from './mock-translation';
@@ -36,5 +38,27 @@ export function getClassificationService(departments: Department[]): Classificat
   return new MockClassificationService(departments);
 }
 
-export type { ASRService, TranslationService, ClassificationService } from './types';
+export function getComplaintAnalyzer(): ComplaintAnalyzer {
+  const provider = process.env.AI_PROVIDER || 'staged';
+  switch (provider) {
+    case 'gemini':
+      // One multimodal call: transcript, translations, department, area, urgency.
+      return new GeminiComplaintAnalyzer();
+    case 'staged':
+    default:
+      // ASR → translation → keyword classification, each picked by
+      // ASR_PROVIDER / TRANSLATION_PROVIDER (mock by default).
+      return new StagedComplaintAnalyzer(getASRService, getTranslationService, (input) =>
+        getClassificationService(input.departments)
+      );
+  }
+}
+
+export type {
+  ASRService,
+  TranslationService,
+  ClassificationService,
+  ComplaintAnalyzer,
+  ComplaintAnalysis,
+} from './types';
 export type { Department } from './mock-classification';

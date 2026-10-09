@@ -40,9 +40,18 @@ interface SimulatedCallResult {
 }
 
 // Language hint sent with a simulated call. An explicit choice mirrors a
-// real caller's DTMF selection; 'unspecified' lets the ASR auto-detect from
-// the recording itself.
-type SimulateLanguage = 'unspecified' | 'ur' | 'en'
+// real caller's DTMF selection; 'unspecified' lets the AI auto-detect from
+// the recording itself. Codes match LANGUAGE_MENU in lib/twilio.ts.
+const SIMULATE_LANGUAGES = [
+  { code: 'unspecified', label: 'Auto-detect language' },
+  { code: 'ur', label: 'Urdu (ur)' },
+  { code: 'pa', label: 'Punjabi (pa)' },
+  { code: 'ps', label: 'Pashto (ps)' },
+  { code: 'sd', label: 'Sindhi (sd)' },
+  { code: 'skr', label: 'Saraiki (skr)' },
+  { code: 'en', label: 'English (en)' },
+] as const
+type SimulateLanguage = (typeof SIMULATE_LANGUAGES)[number]['code']
 
 export default function AdminDashboard() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
@@ -164,7 +173,9 @@ export default function AdminDashboard() {
           <Select
             value={simulateLanguage}
             onValueChange={(v: string | null) =>
-              setSimulateLanguage(v === 'ur' || v === 'en' ? v : 'unspecified')
+              setSimulateLanguage(
+                SIMULATE_LANGUAGES.find((l) => l.code === v)?.code ?? 'unspecified'
+              )
             }
           >
             <SelectTrigger
@@ -176,9 +187,11 @@ export default function AdminDashboard() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="unspecified">Auto-detect language</SelectItem>
-              <SelectItem value="ur">Urdu (ur)</SelectItem>
-              <SelectItem value="en">English (en)</SelectItem>
+              {SIMULATE_LANGUAGES.map((l) => (
+                <SelectItem key={l.code} value={l.code}>
+                  {l.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <Button variant="outline" size="sm" onClick={handleSimulateCall} disabled={simulating}>

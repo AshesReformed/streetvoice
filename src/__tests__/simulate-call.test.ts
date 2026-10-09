@@ -174,7 +174,8 @@ describe('Simulate Call Endpoint (admin-only)', () => {
     // The generated payload must satisfy the webhook contract
     const payload = mockProcessIncomingCall.mock.calls[0][0];
     expect(payload.call_ref).toMatch(/^sim-/);
-    expect(payload.audio_url).toMatch(/^https:\/\/.+\/samples\/[a-z]+\.mp3$/);
+    // Canned samples are served by the app itself from public/samples/
+    expect(payload.audio_url).toMatch(/^http:\/\/localhost:3000\/samples\/[a-z]+\.wav$/);
     expect(typeof payload.dtmf_language).toBe('string');
     expect(payload.caller_id).toMatch(/^\+92/);
 
@@ -221,9 +222,7 @@ describe('Simulate Call Endpoint (admin-only)', () => {
 
     expect(res.status).toBe(200);
     const payload = mockProcessIncomingCall.mock.calls[0][0];
-    expect(payload.audio_url).toMatch(
-      /^https:\/\/cdn\.streetvoice\.dev\/samples\/[a-z]+\.mp3$/
-    );
+    expect(payload.audio_url).toMatch(/^http:\/\/localhost:3000\/samples\/[a-z]+\.wav$/);
   });
 
   it('forwards a supplied language hint to the pipeline', async () => {

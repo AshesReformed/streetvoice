@@ -1,7 +1,7 @@
 import { ASRService, ASRInput, ASROutput } from './types';
 
 // Sample transcripts used by the mock ASR. The scenario is derived from the
-// audio file name in the URL (e.g. ".../samples/streetlight.mp3") so dev
+// audio file name in the URL (e.g. ".../samples/streetlight.wav") so dev
 // tooling can simulate different kinds of calls by pointing at a named
 // sample. URLs without a recognized sample fall back to the water complaint,
 // preserving the original mock behavior.
@@ -26,6 +26,16 @@ export const SAMPLE_SCENARIOS: Record<string, { transcript: string; confidence: 
       'There is no electricity in our area since last night. The transformer near the market is sparking and power lines are down.',
     confidence: 0.9,
   },
+  pothole: {
+    transcript:
+      'There is a big pothole on our road and last night a motorcyclist fell into it.',
+    confidence: 0.87,
+  },
+  mixed: {
+    transcript:
+      'The sewerage line in our area is blocked and dirty water is coming onto the road.',
+    confidence: 0.85,
+  },
   unclear: {
     transcript:
       'Hello... hello... I want to report something but the line is very bad, I cannot hear anything.',
@@ -36,7 +46,7 @@ export const SAMPLE_SCENARIOS: Record<string, { transcript: string; confidence: 
 
 export class MockASRService implements ASRService {
   async transcribe(input: ASRInput): Promise<ASROutput> {
-    const match = input.audio_url.match(/\/samples\/([a-z]+)\.mp3/);
+    const match = input.audio_url.match(/\/samples\/([a-z]+)\.(?:mp3|wav)/);
     const sample = (match && SAMPLE_SCENARIOS[match[1]]) || SAMPLE_SCENARIOS.water;
 
     return {

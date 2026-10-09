@@ -3,6 +3,7 @@ export interface Department {
   name: string;
   keywords: string[];
   contact_info: string | null;
+  description: string | null;
   created_at: string;
 }
 
@@ -33,6 +34,9 @@ export interface Complaint {
   transcript_regional: string | null;
   transcript_urdu: string | null;
   transcript_english: string | null;
+  summary: string | null;
+  language: string | null;
+  review_reason: string | null;
   confidence_score: number | null;
   status: 'needs_review' | 'open' | 'in_progress' | 'resolved';
   priority: 'low' | 'medium' | 'high';
