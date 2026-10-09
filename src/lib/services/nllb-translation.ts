@@ -1,4 +1,3 @@
-import type { TranslationPipeline } from '@xenova/transformers';
 import { TranslationService, TranslationInput, TranslationOutput } from './types';
 
 // ===========================================================================

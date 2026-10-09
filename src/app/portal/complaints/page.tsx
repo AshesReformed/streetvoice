@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useState } from 'react'
+import { useApi } from '@/lib/hooks/use-api'
 import { useRouter } from 'next/navigation'
 import { PageHeader } from '@/components/page-header'
 import { ComplaintsTable } from '@/components/complaints-table'
@@ -35,44 +36,25 @@ const PAGE_SIZE = 20
 
 export default function ComplaintsPage() {
   const router = useRouter()
-  const [complaints, setComplaints] = useState<Complaint[]>([])
-  const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [status, setStatus] = useState('')
   const [priority, setPriority] = useState('')
   const [area, setArea] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+
+  const params = new URLSearchParams()
+  params.set('page', String(page))
+  params.set('limit', String(PAGE_SIZE))
+  if (status) params.set('status', status)
+  if (priority) params.set('priority', priority)
+  if (area) params.set('area', area)
+
+  const { data, loading, error, reload } = useApi<{ complaints: Complaint[]; total: number }>(
+    `/api/complaints?${params.toString()}`
+  )
+  const complaints = data?.complaints ?? []
+  const total = data?.total ?? 0
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
-
-  const fetchComplaints = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const params = new URLSearchParams()
-      params.set('page', String(page))
-      params.set('limit', String(PAGE_SIZE))
-      if (status) params.set('status', status)
-      if (priority) params.set('priority', priority)
-      if (area) params.set('area', area)
-
-      const res = await fetch(`/api/complaints?${params.toString()}`)
-      if (!res.ok) throw new Error('Failed to fetch complaints')
-
-      const json = await res.json()
-      setComplaints(json.data.complaints)
-      setTotal(json.data.total)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong')
-    } finally {
-      setLoading(false)
-    }
-  }, [page, status, priority, area])
-
-  useEffect(() => {
-    fetchComplaints()
-  }, [fetchComplaints])
 
   // Reset to page 1 when filters change
   function handleStatusChange(val: string | null) {
@@ -86,7 +68,7 @@ export default function ComplaintsPage() {
   function handleAreaSubmit(e: React.FormEvent) {
     e.preventDefault()
     setPage(1)
-    fetchComplaints()
+    reload()
   }
 
   function handleRowClick(complaint: Complaint) {

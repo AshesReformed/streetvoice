@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useState } from 'react'
 import { PageHeader } from '@/components/page-header'
+import { useApi } from '@/lib/hooks/use-api'
 import {
   Card,
   CardContent,
@@ -25,13 +26,17 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Pencil, Trash2, X } from 'lucide-react'
+import { Plus, Pencil, Trash2 } from 'lucide-react'
 import type { Department } from '@/lib/types'
 
 export default function DepartmentsPage() {
-  const [departments, setDepartments] = useState<Department[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const {
+    data: departmentsData,
+    loading,
+    error,
+    reload: reloadDepartments,
+  } = useApi<Department[]>('/api/departments')
+  const departments = departmentsData ?? []
 
   // Dialog state
   const [addOpen, setAddOpen] = useState(false)
@@ -50,23 +55,6 @@ export default function DepartmentsPage() {
   const [deletingDept, setDeletingDept] = useState<Department | null>(null)
   const [deleteSaving, setDeleteSaving] = useState(false)
   const [deleteError, setDeleteError] = useState('')
-
-  const fetchDepartments = useCallback(async () => {
-    try {
-      const res = await fetch('/api/departments')
-      if (!res.ok) throw new Error('Failed to fetch departments')
-      const json = await res.json()
-      setDepartments(json.data)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    fetchDepartments()
-  }, [fetchDepartments])
 
   function openAdd() {
     setFormName('')
@@ -114,7 +102,7 @@ export default function DepartmentsPage() {
         throw new Error(json.error || 'Failed to create')
       }
       setAddOpen(false)
-      await fetchDepartments()
+      reloadDepartments()
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Error')
     } finally {
@@ -145,7 +133,7 @@ export default function DepartmentsPage() {
       }
       setEditOpen(false)
       setEditingDept(null)
-      await fetchDepartments()
+      reloadDepartments()
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Error')
     } finally {
@@ -173,7 +161,7 @@ export default function DepartmentsPage() {
       }
       setDeleteOpen(false)
       setDeletingDept(null)
-      await fetchDepartments()
+      reloadDepartments()
     } catch (err) {
       setDeleteError(err instanceof Error ? err.message : 'Error')
     } finally {

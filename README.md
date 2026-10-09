@@ -69,7 +69,7 @@ All AI services are implemented behind swappable TypeScript interfaces (`ASRServ
 ## Running It Locally
 
 1. Create a Supabase project and run the three migration files in `supabase/migrations/` in order via the SQL Editor.
-2. Copy `.env.example` to `.env.local` and fill in your Supabase URL/keys.
+2. Copy `.env.example` to `.env.local` and fill in your Supabase URL/keys, plus `SEED_ADMIN_PASSWORD` and `SEED_OFFICER_PASSWORD` for the demo accounts.
 3. Set `ASR_PROVIDER=whisper` and `TRANSLATION_PROVIDER=nllb` to run the real AI pipeline (leave as `mock` for instant, lightweight testing).
 4. Run `npm install`, then `npm run seed:officers` to create demo accounts.
 5. `npm run dev`, then open `localhost:3000`.

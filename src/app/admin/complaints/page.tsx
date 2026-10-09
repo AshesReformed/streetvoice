@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useState } from 'react'
+import { useApi } from '@/lib/hooks/use-api'
 import { useRouter } from 'next/navigation'
 import { PageHeader } from '@/components/page-header'
 import { ComplaintsTable } from '@/components/complaints-table'
@@ -22,12 +23,7 @@ const PAGE_SIZE = 20
 
 export default function AllComplaintsPage() {
   const router = useRouter()
-  const [complaints, setComplaints] = useState<Complaint[]>([])
-  const [departments, setDepartments] = useState<Department[]>([])
-  const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
 
   // Filters
   const [status, setStatus] = useState('')
@@ -35,50 +31,23 @@ export default function AllComplaintsPage() {
   const [departmentId, setDepartmentId] = useState('')
   const [areaSearch, setAreaSearch] = useState('')
 
-  useEffect(() => {
-    async function fetchDepartments() {
-      const res = await fetch('/api/departments')
-      if (res.ok) {
-        const json = await res.json()
-        setDepartments(json.data)
-      }
-    }
-    fetchDepartments()
-  }, [])
+  const { data: departmentsData } = useApi<Department[]>('/api/departments')
+  const departments = departmentsData ?? []
 
-  const fetchComplaints = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const params = new URLSearchParams({
-        page: String(page),
-        limit: String(PAGE_SIZE),
-      })
-      if (status) params.set('status', status)
-      if (priority) params.set('priority', priority)
-      if (areaSearch) params.set('area', areaSearch)
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(PAGE_SIZE),
+  })
+  if (status) params.set('status', status)
+  if (priority) params.set('priority', priority)
+  if (departmentId) params.set('department_id', departmentId)
+  if (areaSearch) params.set('area', areaSearch)
 
-      const res = await fetch(`/api/complaints?${params}`)
-      if (!res.ok) throw new Error('Failed to fetch complaints')
-      const json = await res.json()
-
-      // Filter by department client-side since API doesn't support it
-      let filtered: Complaint[] = json.data.complaints
-      if (departmentId) {
-        filtered = filtered.filter((c) => c.department_id === departmentId)
-      }
-      setComplaints(filtered)
-      setTotal(json.data.total)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
-    } finally {
-      setLoading(false)
-    }
-  }, [page, status, priority, areaSearch, departmentId])
-
-  useEffect(() => {
-    fetchComplaints()
-  }, [fetchComplaints])
+  const { data, loading, error } = useApi<{ complaints: Complaint[]; total: number }>(
+    `/api/complaints?${params}`
+  )
+  const complaints = data?.complaints ?? []
+  const total = data?.total ?? 0
 
   function handleResetFilters() {
     setStatus('')

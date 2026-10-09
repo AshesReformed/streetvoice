@@ -39,7 +39,10 @@ function LoginForm() {
       return
     }
 
-    const redirect = searchParams.get('redirect') || '/portal'
+    // Only follow same-site paths ("/admin"), never "//evil.com" or full URLs
+    const requested = searchParams.get('redirect')
+    const redirect =
+      requested && requested.startsWith('/') && !requested.startsWith('//') ? requested : '/portal'
     router.push(redirect)
     router.refresh()
   }
@@ -50,7 +53,7 @@ function LoginForm() {
         <form onSubmit={handleLogin}>
           <CardHeader className="text-center">
             <CardTitle className="text-2xl font-bold tracking-tight">
-              ShikayatDar
+              StreetVoice
             </CardTitle>
             <CardDescription>Sign in to your account</CardDescription>
           </CardHeader>

@@ -21,13 +21,13 @@ export const rerouteComplaintSchema = z.object({
 export const createDepartmentSchema = z.object({
   name: z.string().min(1),
   keywords: z.array(z.string()).default([]),
-  contact_info: z.string().optional(),
+  contact_info: z.string().nullable().optional(),
 });
 
 export const updateDepartmentSchema = z.object({
   name: z.string().min(1).optional(),
   keywords: z.array(z.string()).optional(),
-  contact_info: z.string().optional(),
+  contact_info: z.string().nullable().optional(),
 });
 
 export const updateOfficerSchema = z.object({

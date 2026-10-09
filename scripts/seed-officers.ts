@@ -27,46 +27,61 @@ const supabase = createClient(supabaseUrl, serviceRoleKey, {
   },
 });
 
+// Demo account passwords come from .env.local, never from the repo. Re-running
+// the script resets existing accounts to these passwords, which is also how
+// to rotate them.
+const MIN_PASSWORD_LENGTH = 12;
+const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? '';
+const officerPassword = process.env.SEED_OFFICER_PASSWORD ?? '';
+
+if (adminPassword.length < MIN_PASSWORD_LENGTH || officerPassword.length < MIN_PASSWORD_LENGTH) {
+  console.error(
+    `ERROR: SEED_ADMIN_PASSWORD and SEED_OFFICER_PASSWORD must be set in .env.local ` +
+      `(at least ${MIN_PASSWORD_LENGTH} characters each)`
+  );
+  process.exit(1);
+}
+
 // Officer definitions
 const officersToCreate = [
   {
     email: 'admin@streetvoice.pk',
-    password: 'admin123456',
+    password: adminPassword,
     role: 'admin' as const,
     fullName: 'System Admin',
     departmentName: null,
   },
   {
     email: 'water.officer@streetvoice.pk',
-    password: 'officer123456',
+    password: officerPassword,
     role: 'officer' as const,
     fullName: 'Water & Sanitation Officer',
     departmentName: 'Water & Sanitation',
   },
   {
     email: 'electricity.officer@streetvoice.pk',
-    password: 'officer123456',
+    password: officerPassword,
     role: 'officer' as const,
     fullName: 'Electricity Officer',
     departmentName: 'Electricity',
   },
   {
     email: 'roads.officer@streetvoice.pk',
-    password: 'officer123456',
+    password: officerPassword,
     role: 'officer' as const,
     fullName: 'Roads & Infrastructure Officer',
     departmentName: 'Roads & Infrastructure',
   },
   {
     email: 'waste.officer@streetvoice.pk',
-    password: 'officer123456',
+    password: officerPassword,
     role: 'officer' as const,
     fullName: 'Sanitation & Waste Officer',
     departmentName: 'Sanitation & Waste',
   },
   {
     email: 'general.officer@streetvoice.pk',
-    password: 'officer123456',
+    password: officerPassword,
     role: 'officer' as const,
     fullName: 'General Officer',
     departmentName: 'General/Unclassified',
@@ -96,7 +111,6 @@ async function main() {
   // Create each officer
   const seededAccounts: {
     email: string;
-    password: string;
     role: string;
     department: string;
   }[] = [];
@@ -136,6 +150,16 @@ async function main() {
         }
         userId = existing.id;
         console.log(`  ✓ Found existing user: ${userId}`);
+
+        // Reset to the password from .env.local (rotates old demo passwords)
+        const { error: passwordError } = await supabase.auth.admin.updateUserById(userId, {
+          password: officer.password,
+        });
+        if (passwordError) {
+          console.error(`  ✗ Failed to reset password: ${passwordError.message}`);
+        } else {
+          console.log(`  ✓ Password reset from .env.local`);
+        }
       } else {
         console.error(`  ✗ Failed to create auth user: ${authError.message}`);
         continue;
@@ -192,22 +216,19 @@ async function main() {
 
     seededAccounts.push({
       email: officer.email,
-      password: officer.password,
       role: officer.role,
       department: officer.departmentName ?? '—',
     });
   }
 
-  // Print credential summary
+  // Print account summary (passwords stay in .env.local, never in logs)
   console.log('\n✅ Seeded Officers:');
   console.log(
-    '┌' + '─'.repeat(45) + '┬' + '─'.repeat(16) + '┬' + '─'.repeat(10) + '┬' + '─'.repeat(28) + '┐',
+    '┌' + '─'.repeat(45) + '┬' + '─'.repeat(10) + '┬' + '─'.repeat(28) + '┐',
   );
   console.log(
     '│ ' +
       'Email'.padEnd(43) +
-      '│ ' +
-      'Password'.padEnd(14) +
       '│ ' +
       'Role'.padEnd(8) +
       '│ ' +
@@ -215,14 +236,12 @@ async function main() {
       '│',
   );
   console.log(
-    '├' + '─'.repeat(45) + '┼' + '─'.repeat(16) + '┼' + '─'.repeat(10) + '┼' + '─'.repeat(28) + '┤',
+    '├' + '─'.repeat(45) + '┼' + '─'.repeat(10) + '┼' + '─'.repeat(28) + '┤',
   );
   for (const acct of seededAccounts) {
     console.log(
       '│ ' +
         acct.email.padEnd(43) +
-        '│ ' +
-        acct.password.padEnd(14) +
         '│ ' +
         acct.role.padEnd(8) +
         '│ ' +
@@ -231,8 +250,9 @@ async function main() {
     );
   }
   console.log(
-    '└' + '─'.repeat(45) + '┴' + '─'.repeat(16) + '┴' + '─'.repeat(10) + '┴' + '─'.repeat(28) + '┘',
+    '└' + '─'.repeat(45) + '┴' + '─'.repeat(10) + '┴' + '─'.repeat(28) + '┘',
   );
+  console.log('Passwords: SEED_ADMIN_PASSWORD (admin) and SEED_OFFICER_PASSWORD (officers) in .env.local');
   console.log(`\n🎉 Seed complete. ${seededAccounts.length} account(s) processed.`);
 }
 

@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useState } from 'react'
+import { useApi } from '@/lib/hooks/use-api'
 import { format } from 'date-fns'
 import { PageHeader } from '@/components/page-header'
 import {
@@ -37,10 +38,16 @@ import { Plus, Pencil, Trash2 } from 'lucide-react'
 import type { Officer, Department } from '@/lib/types'
 
 export default function OfficersPage() {
-  const [officers, setOfficers] = useState<Officer[]>([])
-  const [departments, setDepartments] = useState<Department[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const {
+    data: officersData,
+    loading,
+    error,
+    reload: reloadOfficers,
+  } = useApi<Officer[]>('/api/officers')
+  const officers = officersData ?? []
+  // Departments for the dropdowns
+  const { data: departmentsData } = useApi<Department[]>('/api/departments')
+  const departments = departmentsData ?? []
 
   // Dialog state
   const [addOpen, setAddOpen] = useState(false)
@@ -66,32 +73,6 @@ export default function OfficersPage() {
   const [deletingOfficer, setDeletingOfficer] = useState<Officer | null>(null)
   const [deleteSaving, setDeleteSaving] = useState(false)
   const [deleteError, setDeleteError] = useState('')
-
-  const fetchOfficers = useCallback(async () => {
-    try {
-      const res = await fetch('/api/officers')
-      if (!res.ok) throw new Error('Failed to fetch officers')
-      const json = await res.json()
-      setOfficers(json.data)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    fetchOfficers()
-    // Fetch departments for dropdown
-    async function fetchDepts() {
-      const res = await fetch('/api/departments')
-      if (res.ok) {
-        const json = await res.json()
-        setDepartments(json.data)
-      }
-    }
-    fetchDepts()
-  }, [fetchOfficers])
 
   function openAdd() {
     setFormEmail('')
@@ -135,7 +116,7 @@ export default function OfficersPage() {
         throw new Error(json.error || 'Failed to create officer')
       }
       setAddOpen(false)
-      await fetchOfficers()
+      reloadOfficers()
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Error')
     } finally {
@@ -181,7 +162,7 @@ export default function OfficersPage() {
       }
       setEditOpen(false)
       setEditingOfficer(null)
-      await fetchOfficers()
+      reloadOfficers()
     } catch (err) {
       setEditError(err instanceof Error ? err.message : 'Error')
     } finally {
@@ -209,7 +190,7 @@ export default function OfficersPage() {
       }
       setDeleteOpen(false)
       setDeletingOfficer(null)
-      await fetchOfficers()
+      reloadOfficers()
     } catch (err) {
       setDeleteError(err instanceof Error ? err.message : 'Error')
     } finally {

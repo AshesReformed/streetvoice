@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
     const priority = searchParams.get('priority');
     const area = searchParams.get('area');
+    const departmentId = searchParams.get('department_id');
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20', 10)));
     const offset = (page - 1) * limit;
@@ -27,6 +28,7 @@ export async function GET(request: NextRequest) {
     if (status) query = query.eq('status', status);
     if (priority) query = query.eq('priority', priority);
     if (area) query = query.eq('area', area);
+    if (departmentId) query = query.eq('department_id', departmentId);
 
     const { data: complaints, error, count } = await query;
 

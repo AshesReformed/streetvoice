@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useApi } from '@/lib/hooks/use-api'
 import { PageHeader } from '@/components/page-header'
 import {
   Card,
@@ -30,50 +31,29 @@ import type { Complaint, Department } from '@/lib/types'
 
 export default function NeedsReviewPage() {
   const router = useRouter()
-  const [complaints, setComplaints] = useState<Complaint[]>([])
-  const [departments, setDepartments] = useState<Department[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const {
+    data: complaintsData,
+    loading,
+    error: loadError,
+    reload: reloadComplaints,
+  } = useApi<{ complaints: Complaint[] }>('/api/complaints?status=needs_review&limit=100')
+  const { data: departmentsData } = useApi<Department[]>('/api/departments')
+  const departments = departmentsData ?? []
+  // Only unassigned complaints (department_id is null)
+  const complaints = (complaintsData?.complaints ?? []).filter((c) => !c.department_id)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const error = loadError ?? actionError
 
   // Assign state: { complaintId -> deptId }
   const [assignMap, setAssignMap] = useState<Record<string, string>>({})
   const [savingId, setSavingId] = useState<string | null>(null)
-
-  const fetchData = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const [compRes, deptRes] = await Promise.all([
-        fetch('/api/complaints?status=needs_review&limit=100'),
-        fetch('/api/departments'),
-      ])
-      if (!compRes.ok) throw new Error('Failed to fetch complaints')
-
-      const compJson = await compRes.json()
-      const deptJson = await deptRes.json()
-
-      // Filter to only unassigned (department_id is null)
-      const unassigned = (compJson.data.complaints as Complaint[]).filter(
-        (c) => !c.department_id
-      )
-      setComplaints(unassigned)
-      setDepartments(deptJson.data)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    fetchData()
-  }, [fetchData])
 
   async function handleAssign(complaintId: string) {
     const deptId = assignMap[complaintId]
     if (!deptId) return
 
     setSavingId(complaintId)
+    setActionError(null)
     try {
       const res = await fetch(`/api/complaints/${complaintId}`, {
         method: 'PATCH',
@@ -84,15 +64,15 @@ export default function NeedsReviewPage() {
         const json = await res.json()
         throw new Error(json.error || 'Failed to assign')
       }
-      // Remove from list
-      setComplaints((prev) => prev.filter((c) => c.id !== complaintId))
+      // Refetch; the assigned complaint drops out of the list
+      reloadComplaints()
       setAssignMap((prev) => {
         const next = { ...prev }
         delete next[complaintId]
         return next
       })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error assigning')
+      setActionError(err instanceof Error ? err.message : 'Error assigning')
     } finally {
       setSavingId(null)
     }
