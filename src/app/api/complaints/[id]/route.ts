@@ -18,11 +18,28 @@ export async function PATCH(
 
     const supabase = createAdminClient();
 
+    const { data: current } = await supabase
+      .from('complaints')
+      .select('status')
+      .eq('id', id)
+      .maybeSingle();
+    if (!current) {
+      return NextResponse.json({ error: 'Complaint not found' }, { status: 404 });
+    }
+
+    // Routing a held complaint releases it to the department's queue
+    const update: { department_id: string; status?: string } = {
+      department_id: data.department_id,
+    };
+    if (current.status === 'needs_review' || current.status === 'processing') {
+      update.status = 'open';
+    }
+
     const { data: complaint, error } = await supabase
       .from('complaints')
-      .update({ department_id: data.department_id })
+      .update(update)
       .eq('id', id)
-      .select('id, department_id')
+      .select('id, department_id, status')
       .single();
 
     if (error) {
@@ -36,6 +53,7 @@ export async function PATCH(
       data: {
         id: complaint.id,
         department_id: complaint.department_id,
+        status: complaint.status,
       },
     });
   } catch (err) {

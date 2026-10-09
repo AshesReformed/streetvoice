@@ -82,6 +82,8 @@ describe('Simulate Call Endpoint (admin-only)', () => {
     vi.stubEnv('NODE_ENV', 'production');
     mockRequireAuth.mockResolvedValue(adminUser());
     mockProcessIncomingCall.mockResolvedValue({
+    complaint_id: 'complaint-1',
+    created: true,
       tracking_id: 'SV-000042',
       spoken_confirmation_text: 'Your complaint has been registered.',
     });
@@ -143,6 +145,8 @@ describe('Simulate Call Endpoint (admin-only)', () => {
   it('runs the pipeline and returns the created complaint', async () => {
     mockRequireAuth.mockResolvedValue(adminUser());
     mockProcessIncomingCall.mockResolvedValue({
+    complaint_id: 'complaint-1',
+    created: true,
       tracking_id: 'SV-000042',
       spoken_confirmation_text: 'Your complaint has been registered.',
     });
@@ -191,6 +195,8 @@ describe('Simulate Call Endpoint (admin-only)', () => {
   it('uses a supplied audioUrl instead of a random scenario', async () => {
     mockRequireAuth.mockResolvedValue(adminUser());
     mockProcessIncomingCall.mockResolvedValue({
+    complaint_id: 'complaint-1',
+    created: true,
       tracking_id: 'SV-000043',
       spoken_confirmation_text: 'Your complaint has been registered.',
     });
@@ -213,6 +219,8 @@ describe('Simulate Call Endpoint (admin-only)', () => {
   it('ignores a blank audioUrl and falls back to a random scenario', async () => {
     mockRequireAuth.mockResolvedValue(adminUser());
     mockProcessIncomingCall.mockResolvedValue({
+    complaint_id: 'complaint-1',
+    created: true,
       tracking_id: 'SV-000044',
       spoken_confirmation_text: 'Your complaint has been registered.',
     });
@@ -228,6 +236,8 @@ describe('Simulate Call Endpoint (admin-only)', () => {
   it('forwards a supplied language hint to the pipeline', async () => {
     mockRequireAuth.mockResolvedValue(adminUser());
     mockProcessIncomingCall.mockResolvedValue({
+    complaint_id: 'complaint-1',
+    created: true,
       tracking_id: 'SV-000045',
       spoken_confirmation_text: 'Your complaint has been registered.',
     });
@@ -248,6 +258,8 @@ describe('Simulate Call Endpoint (admin-only)', () => {
   it('sends no language hint for a custom recording left unspecified', async () => {
     mockRequireAuth.mockResolvedValue(adminUser());
     mockProcessIncomingCall.mockResolvedValue({
+    complaint_id: 'complaint-1',
+    created: true,
       tracking_id: 'SV-000046',
       spoken_confirmation_text: 'Your complaint has been registered.',
     });
@@ -265,6 +277,8 @@ describe('Simulate Call Endpoint (admin-only)', () => {
   it('sends no language hint for a custom recording without a language field', async () => {
     mockRequireAuth.mockResolvedValue(adminUser());
     mockProcessIncomingCall.mockResolvedValue({
+    complaint_id: 'complaint-1',
+    created: true,
       tracking_id: 'SV-000047',
       spoken_confirmation_text: 'Your complaint has been registered.',
     });
@@ -281,6 +295,8 @@ describe('Simulate Call Endpoint (admin-only)', () => {
   it('uses the explicit language even without a custom audio URL', async () => {
     mockRequireAuth.mockResolvedValue(adminUser());
     mockProcessIncomingCall.mockResolvedValue({
+    complaint_id: 'complaint-1',
+    created: true,
       tracking_id: 'SV-000048',
       spoken_confirmation_text: 'Your complaint has been registered.',
     });

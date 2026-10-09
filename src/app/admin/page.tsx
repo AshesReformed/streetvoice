@@ -147,6 +147,7 @@ export default function AdminDashboard() {
 
   const statItems = [
     { label: 'Total Complaints', value: summary.total_complaints },
+    { label: 'Processing', value: summary.by_status.processing ?? 0 },
     { label: 'Needs Review', value: summary.by_status.needs_review ?? 0 },
     { label: 'Open', value: summary.by_status.open ?? 0 },
     { label: 'In Progress', value: summary.by_status.in_progress ?? 0 },

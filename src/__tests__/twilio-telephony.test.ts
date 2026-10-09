@@ -69,6 +69,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   stubTwilioEnv();
   mockProcessIncomingCall.mockResolvedValue({
+    complaint_id: 'complaint-1',
+    created: true,
     tracking_id: 'SV-000001',
     spoken_confirmation_text:
       'Your complaint has been registered. Your tracking ID is SV-000001. Please save this for future reference.',

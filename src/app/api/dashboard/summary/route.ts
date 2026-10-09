@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
     const totalComplaints = complaints.length;
 
     const byStatus = {
+      processing: 0,
       needs_review: 0,
       open: 0,
       in_progress: 0,

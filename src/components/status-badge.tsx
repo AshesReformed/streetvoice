@@ -1,6 +1,10 @@
 import { Badge } from '@/components/ui/badge'
 
 const statusConfig: Record<string, { label: string; className: string }> = {
+  processing: {
+    label: 'Processing',
+    className: 'bg-slate-100 text-slate-700 border-slate-200',
+  },
   needs_review: {
     label: 'Needs Review',
     className: 'bg-amber-100 text-amber-800 border-amber-200',

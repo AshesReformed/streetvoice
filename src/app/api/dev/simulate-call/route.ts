@@ -113,7 +113,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await processIncomingCall(parsed.data);
+    // Analyze inline so the admin sees where the complaint was routed
+    const result = await processIncomingCall(parsed.data, { wait: true });
 
     // Load the stored complaint so the UI can show how it was classified
     const supabase = createAdminClient();

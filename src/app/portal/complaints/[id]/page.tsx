@@ -197,7 +197,7 @@ export default function ComplaintDetailPage({
             <CardTitle>Audio Recording</CardTitle>
           </CardHeader>
           <CardContent>
-            <audio controls src={complaint.audio_url} className="w-full" preload="none">
+            <audio controls src={`/api/complaints/${complaint.id}/recording`} className="w-full" preload="none">
               Your browser does not support the audio element.
             </audio>
           </CardContent>
