@@ -36,7 +36,9 @@ export default function NeedsReviewPage() {
     loading,
     error: loadError,
     reload: reloadComplaints,
-  } = useApi<{ complaints: Complaint[] }>('/api/complaints?status=needs_review&limit=100')
+  } = useApi<{ complaints: Complaint[] }>('/api/complaints?status=needs_review&limit=100', {
+    refreshMs: 10_000,
+  })
   const { data: departmentsData } = useApi<Department[]>('/api/departments')
   const departments = departmentsData ?? []
   // Only unassigned complaints (department_id is null)

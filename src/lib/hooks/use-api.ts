@@ -13,11 +13,18 @@ interface ApiState<T> {
  * state. Refetches whenever `url` changes, or when `reload()` is called
  * (e.g. after a mutation). `loading` is true until the current URL has
  * answered once; a reload keeps showing the previous data meanwhile.
- * Pass `null` to skip fetching.
+ * Pass `null` to skip fetching. With `refreshMs`, it also refetches on that
+ * interval (live dashboards).
  */
-export function useApi<T>(url: string | null) {
+export function useApi<T>(url: string | null, { refreshMs }: { refreshMs?: number } = {}) {
   const [state, setState] = useState<ApiState<T>>({ url: null, data: null, error: null })
   const [reloadKey, setReloadKey] = useState(0)
+
+  useEffect(() => {
+    if (!url || !refreshMs) return
+    const timer = setInterval(() => setReloadKey((k) => k + 1), refreshMs)
+    return () => clearInterval(timer)
+  }, [url, refreshMs])
 
   useEffect(() => {
     if (!url) return

@@ -44,7 +44,8 @@ export default function AllComplaintsPage() {
   if (areaSearch) params.set('area', areaSearch)
 
   const { data, loading, error } = useApi<{ complaints: Complaint[]; total: number }>(
-    `/api/complaints?${params}`
+    `/api/complaints?${params}`,
+    { refreshMs: 10_000 }
   )
   const complaints = data?.complaints ?? []
   const total = data?.total ?? 0

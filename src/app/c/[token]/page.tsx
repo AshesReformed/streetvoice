@@ -52,7 +52,9 @@ export default async function DepartmentComplaintPage({
           <p className="text-sm text-muted-foreground">StreetVoice</p>
           <h1 className="font-mono text-3xl font-bold tracking-widest">{complaint.tracking_id}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {department?.name_ur ?? department?.name ?? '—'} · {filedAt}
+            <span dir="rtl">{department?.name_ur ?? department?.name ?? '—'}</span>
+            <span> · </span>
+            <span dir="ltr">{filedAt}</span>
           </p>
         </div>
 

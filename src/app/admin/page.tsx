@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import { useApi } from '@/lib/hooks/use-api'
 import Link from 'next/link'
 import { PhoneCall } from 'lucide-react'
 import { PageHeader } from '@/components/page-header'
@@ -54,9 +55,13 @@ const SIMULATE_LANGUAGES = [
 type SimulateLanguage = (typeof SIMULATE_LANGUAGES)[number]['code']
 
 export default function AdminDashboard() {
-  const [summary, setSummary] = useState<DashboardSummary | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // Refreshes every 10 s so new calls show up live during a demo
+  const {
+    data: summary,
+    loading,
+    error,
+    reload: refreshSummary,
+  } = useApi<DashboardSummary>('/api/dashboard/summary', { refreshMs: 10_000 })
 
   // Test call simulation (admin-only)
   const [simulating, setSimulating] = useState(false)
@@ -64,33 +69,6 @@ export default function AdminDashboard() {
   const [simulateError, setSimulateError] = useState<string | null>(null)
   const [customAudioUrl, setCustomAudioUrl] = useState('')
   const [simulateLanguage, setSimulateLanguage] = useState<SimulateLanguage>('unspecified')
-
-  useEffect(() => {
-    async function loadSummary() {
-      try {
-        const res = await window.fetch('/api/dashboard/summary')
-        if (!res.ok) throw new Error('Failed to fetch summary')
-        const json = await res.json()
-        setSummary(json.data)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error')
-      } finally {
-        setLoading(false)
-      }
-    }
-    loadSummary()
-  }, [])
-
-  async function refreshSummary() {
-    try {
-      const res = await window.fetch('/api/dashboard/summary')
-      if (!res.ok) return
-      const json = await res.json()
-      if (json.data) setSummary(json.data)
-    } catch {
-      // Background refresh — keep the stale summary on failure
-    }
-  }
 
   async function handleSimulateCall() {
     setSimulating(true)
@@ -111,7 +89,7 @@ export default function AdminDashboard() {
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || 'Failed to simulate call')
       setSimulated(json.data as SimulatedCallResult)
-      await refreshSummary()
+      refreshSummary()
     } catch (err) {
       setSimulateError(err instanceof Error ? err.message : 'Unknown error')
     } finally {

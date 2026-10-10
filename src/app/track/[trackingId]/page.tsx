@@ -1,37 +1,34 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-  CardFooter,
-} from "@/components/ui/card";
+import { toAsciiDigits } from "@/lib/sms/phone";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 
-const STATUS_STYLES: Record<string, string> = {
-  processing:
-    "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
-  needs_review:
-    "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
-  open: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
-  in_progress:
-    "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300",
-  resolved:
-    "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
+// Public complaint tracker, in Urdu and English. Shows only the status, the
+// department and when each step happened: no transcripts, remarks or
+// caller details.
+
+const STEPS = [
+  { status: "processing", ur: "شکایت موصول ہوئی", en: "Received" },
+  { status: "open", ur: "محکمے کو بھیج دی گئی", en: "Sent to department" },
+  { status: "in_progress", ur: "کام جاری ہے", en: "Work in progress" },
+  { status: "resolved", ur: "حل ہو گئی", en: "Resolved" },
+] as const;
+
+// needs_review sits between "received" and "sent": still being checked
+const STEP_INDEX: Record<string, number> = {
+  processing: 0,
+  needs_review: 0,
+  open: 1,
+  in_progress: 2,
+  resolved: 3,
 };
 
-function StatusBadge({ status }: { status: string }) {
-  const style =
-    STATUS_STYLES[status] ??
-    "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300";
-  return (
-    <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${style}`}
-    >
-      {status.replace(/_/g, " ")}
-    </span>
-  );
+function formatTime(iso: string) {
+  return new Date(iso).toLocaleString("en-PK", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Asia/Karachi",
+  });
 }
 
 export default async function TrackPage({
@@ -39,40 +36,32 @@ export default async function TrackPage({
 }: {
   params: Promise<{ trackingId: string }>;
 }) {
-  const { trackingId } = await params;
+  const { trackingId: raw } = await params;
+  const trackingId = toAsciiDigits(decodeURIComponent(raw)).trim();
 
   const supabase = createAdminClient();
   const { data: complaint } = await supabase
     .from("complaints")
-    .select("status, tracking_id, created_at, department:departments(name)")
+    .select("id, status, tracking_id, created_at, department:departments(name, name_ur)")
     .eq("tracking_id", trackingId)
-    .single();
+    .maybeSingle();
 
   if (!complaint) {
     return (
       <div className="flex flex-1 items-center justify-center bg-zinc-50 px-4 dark:bg-zinc-950">
         <Card className="w-full max-w-sm">
           <CardHeader>
-            <CardTitle>Complaint not found</CardTitle>
-            <CardDescription>
-              No complaint found with tracking ID{" "}
-              <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono dark:bg-zinc-800">
+            <CardTitle dir="rtl" className="text-right">شکایت نہیں ملی</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              No complaint found with number{" "}
+              <code className="rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-xs dark:bg-zinc-800">
                 {trackingId}
               </code>
-            </CardDescription>
+            </p>
           </CardHeader>
-          <CardFooter className="flex gap-4">
-            <Link
-              href="/"
-              className="text-sm text-zinc-600 underline hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
-            >
-              Back
-            </Link>
-            <Link
-              href="/"
-              className="text-sm text-zinc-600 underline hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
-            >
-              Check another
+          <CardFooter>
+            <Link href="/" className="text-sm underline">
+              Check another number
             </Link>
           </CardFooter>
         </Card>
@@ -80,77 +69,75 @@ export default async function TrackPage({
     );
   }
 
-  const dept = complaint.department as unknown as { name: string } | null;
-  const deptName = dept?.name ?? "Unassigned";
-  const createdAt = complaint.created_at
-    ? new Date(complaint.created_at as string).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "—";
+  const { data: history } = await supabase
+    .from("status_history")
+    .select("status, created_at")
+    .eq("complaint_id", complaint.id)
+    .order("created_at", { ascending: true });
+
+  // When each step was first reached
+  const reachedAt: Record<string, string> = { processing: complaint.created_at as string };
+  for (const h of history ?? []) {
+    reachedAt[h.status] ??= h.created_at;
+  }
+
+  const current = STEP_INDEX[complaint.status] ?? 0;
+  const dept = complaint.department as unknown as { name: string; name_ur: string | null } | null;
+  const underReview = complaint.status === "needs_review";
 
   return (
-    <div className="flex flex-1 items-center justify-center bg-zinc-50 px-4 dark:bg-zinc-950">
+    <div className="flex flex-1 items-center justify-center bg-zinc-50 px-4 py-8 dark:bg-zinc-950">
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center">
-          <h1 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-            StreetVoice
-          </h1>
+          <p className="text-sm text-muted-foreground">StreetVoice · شکایت نمبر</p>
+          <h1 className="font-mono text-4xl font-bold tracking-[0.2em]">{complaint.tracking_id}</h1>
+          {dept && (
+            <p className="mt-1 text-sm text-muted-foreground">
+              <span dir="rtl">{dept.name_ur ?? dept.name}</span> · {dept.name}
+            </p>
+          )}
         </div>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Complaint Status</CardTitle>
-            <CardDescription>
-              <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono dark:bg-zinc-800">
-                {complaint.tracking_id}
-              </code>
-            </CardDescription>
-          </CardHeader>
           <CardContent>
-            <dl className="space-y-4">
-              <div className="flex items-center justify-between">
-                <dt className="text-sm text-zinc-500 dark:text-zinc-400">
-                  Status
-                </dt>
-                <dd>
-                  <StatusBadge status={complaint.status as string} />
-                </dd>
-              </div>
-              <div className="flex items-center justify-between">
-                <dt className="text-sm text-zinc-500 dark:text-zinc-400">
-                  Department
-                </dt>
-                <dd className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                  {deptName}
-                </dd>
-              </div>
-              <div className="flex items-center justify-between">
-                <dt className="text-sm text-zinc-500 dark:text-zinc-400">
-                  Filed on
-                </dt>
-                <dd className="text-sm text-zinc-700 dark:text-zinc-300">
-                  {createdAt}
-                </dd>
-              </div>
-            </dl>
+            <ol className="space-y-5">
+              {STEPS.map((step, i) => {
+                const done = i <= current;
+                const time = reachedAt[step.status];
+                return (
+                  <li key={step.status} className="flex items-start gap-3">
+                    <span
+                      className={`mt-1 flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
+                        done ? "bg-emerald-600 text-white" : "border-2 border-zinc-300 text-transparent"
+                      }`}
+                      aria-hidden
+                    >
+                      ✓
+                    </span>
+                    <div className="flex-1">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <p className={done ? "font-medium" : "text-muted-foreground"}>{step.en}</p>
+                        <p dir="rtl" className={done ? "font-medium" : "text-muted-foreground"}>
+                          {step.ur}
+                        </p>
+                      </div>
+                      {done && time && <p className="text-xs text-muted-foreground">{formatTime(time)}</p>}
+                      {i === 0 && underReview && (
+                        <p className="text-xs text-amber-700">
+                          Being checked by our team · <span dir="rtl">ہماری ٹیم جانچ رہی ہے</span>
+                        </p>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
           </CardContent>
-          <CardFooter className="flex gap-4">
-            <Link
-              href="/"
-              className="text-sm text-zinc-600 underline hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
-            >
-              Back
-            </Link>
-            <Link
-              href="/"
-              className="text-sm text-zinc-600 underline hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
-            >
+          <CardFooter className="flex justify-between text-sm">
+            <Link href="/" className="underline">
               Check another
             </Link>
+            <span className="text-muted-foreground">Updates also come by SMS</span>
           </CardFooter>
         </Card>
       </div>

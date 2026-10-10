@@ -1,6 +1,5 @@
 'use client'
 
-import { useEffect } from 'react'
 import { format } from 'date-fns'
 import { ArrowDownLeft, ArrowUpRight } from 'lucide-react'
 import { useApi } from '@/lib/hooks/use-api'
@@ -35,12 +34,7 @@ const PURPOSE_LABELS: Record<string, string> = {
 export function SmsLog({ complaintId, limit = 50 }: { complaintId?: string; limit?: number }) {
   const params = new URLSearchParams({ limit: String(limit) })
   if (complaintId) params.set('complaint_id', complaintId)
-  const { data, loading, error, reload } = useApi<SmsMessage[]>(`/api/sms?${params}`)
-
-  useEffect(() => {
-    const timer = setInterval(reload, 5000)
-    return () => clearInterval(timer)
-  }, [reload])
+  const { data, loading, error } = useApi<SmsMessage[]>(`/api/sms?${params}`, { refreshMs: 5000 })
 
   if (loading) return <div className="h-24 animate-pulse rounded-lg bg-muted" />
   if (error) return <p className="text-sm text-destructive">{error}</p>
