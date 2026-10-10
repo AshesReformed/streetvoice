@@ -19,13 +19,15 @@ StreetVoice sends and receives SMS through a spare Android phone running the fre
    SMS_GATEWAY_PASSWORD=<password from the app>
    ```
 
-4. In the app, go to **Settings → Webhooks** and copy the **signing key** into `SMS_WEBHOOK_SIGNING_KEY`.
-5. Register the incoming-SMS webhook once. It needs the app's public address, so do it after deploying:
+4. In the app, go to **Settings → Webhooks → Signing key**, set a long random password of your own, and put the same text in `SMS_WEBHOOK_SIGNING_KEY`.
+5. Register the webhooks once, after deploying. These are incoming SMS plus delivery reports, so the SMS page shows whether each message really went out:
 
    ```bash
-   curl -X POST -u "USERNAME:PASSWORD" -H "Content-Type: application/json" \
-     -d '{"url":"https://<your-app>.vercel.app/api/sms/incoming","event":"sms:received"}' \
-     https://api.sms-gate.app/3rdparty/v1/webhooks
+   for e in sms:received sms:sent sms:delivered sms:failed; do
+     curl -X POST -u "USERNAME:PASSWORD" -H "Content-Type: application/json" \
+       -d "{\"url\":\"https://<your-app>.vercel.app/api/sms/incoming\",\"event\":\"$e\"}" \
+       https://api.sms-gate.app/3rdparty/v1/webhooks
+   done
    ```
 
 6. In the control room, open **Departments** and give each department an **SMS number**. For the demo, use a teammate's phone as "the Electricity department".
@@ -38,6 +40,9 @@ StreetVoice sends and receives SMS through a spare Android phone running the fre
 4. Everything appears live on the control room's **SMS** page.
 
 ## If something goes wrong
+
+- **"Generic failure" on the SMS page:** the phone tried but its SIM could not send. Send a normal SMS from the phone's Messages app to check the SIM has an active SMS bundle or balance, and that it is the default SIM for SMS.
+- **Android blocks the SMS permission:** apps installed from outside the Play Store need Settings → Apps → SMS Gateway → ⋮ → **Allow restricted settings** first.
 
 - **Nothing is sent:** check that the phone is online and the app shows "connected". Failed sends are marked "failed" on the SMS page, with the reason.
 - **Replies are ignored:** the webhook must point at the public URL, and the reply must come from the number saved on that department.

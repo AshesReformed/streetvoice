@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifySmsWebhookSignature } from '@/lib/sms/signature';
 import { handleIncomingSms } from '@/lib/sms/commands';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 // ===========================================================================
-// Incoming SMS webhook from "SMS Gateway for Android" (event sms:received).
+// Webhook for "SMS Gateway for Android": incoming SMS (sms:received) and
+// delivery reports for SMS we sent (sms:sent / sms:delivered / sms:failed).
 // Register it once with the gateway:
 //
 //   curl -X POST -u USER:PASS -H "Content-Type: application/json" \
@@ -15,10 +17,24 @@ import { handleIncomingSms } from '@/lib/sms/commands';
 // SMS_WEBHOOK_SIGNING_KEY. Without a key the endpoint only works in dev.
 // ===========================================================================
 
-interface SmsReceivedEvent {
+interface SmsGatewayEvent {
   event?: string;
-  payload?: { message?: string; sender?: string; phoneNumber?: string };
+  payload?: {
+    message?: string;
+    sender?: string;
+    phoneNumber?: string;
+    messageId?: string;
+    id?: string;
+    reason?: string;
+  };
 }
+
+// Delivery reports (also registered as webhooks) → sms_messages.status
+const DELIVERY_STATUS: Record<string, 'sent' | 'delivered' | 'failed'> = {
+  'sms:sent': 'sent',
+  'sms:delivered': 'delivered',
+  'sms:failed': 'failed',
+};
 
 export async function POST(request: NextRequest) {
   const rawBody = await request.text();
@@ -36,11 +52,27 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'SMS webhook signing key not configured' }, { status: 500 });
   }
 
-  let event: SmsReceivedEvent;
+  let event: SmsGatewayEvent;
   try {
     event = JSON.parse(rawBody);
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+
+  // What happened to an SMS we sent: update its row by the gateway's id
+  const delivery = event.event ? DELIVERY_STATUS[event.event] : undefined;
+  if (delivery) {
+    const ref = event.payload?.messageId ?? event.payload?.id;
+    if (ref) {
+      await createAdminClient()
+        .from('sms_messages')
+        .update({
+          status: delivery,
+          ...(delivery === 'failed' ? { error: event.payload?.reason ?? 'Phone could not send the SMS' } : {}),
+        })
+        .eq('provider_ref', ref);
+    }
+    return NextResponse.json({ data: { status: delivery } });
   }
 
   // Acknowledge other event types so the gateway doesn't retry them

@@ -11,7 +11,7 @@ export interface SmsMessage {
   phone: string
   body: string
   purpose: string | null
-  status: 'queued' | 'sent' | 'failed' | 'received'
+  status: 'queued' | 'sent' | 'delivered' | 'failed' | 'received'
   error: string | null
   created_at: string
   complaint: { tracking_id: string } | null
@@ -72,6 +72,7 @@ export function SmsLog({ complaintId, limit = 50 }: { complaintId?: string; limi
                 </span>
               )}
               {m.status === 'queued' && <span>sending…</span>}
+              {m.status === 'delivered' && <span className="text-emerald-700">delivered</span>}
             </div>
             <p dir="auto" className="mt-1 whitespace-pre-wrap rounded-lg bg-muted/60 px-3 py-2 text-sm">
               {m.body}
