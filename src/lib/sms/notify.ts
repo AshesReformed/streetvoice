@@ -53,9 +53,16 @@ export async function sendSms(opts: {
   }
 }
 
-/** Public base URL for links in SMS (no trailing slash). */
+/**
+ * Public base URL for links in SMS (no trailing slash): PUBLIC_BASE_URL,
+ * else the production domain Vercel provides, else localhost for dev.
+ */
 export function publicBaseUrl(): string {
-  return (process.env.PUBLIC_BASE_URL || 'http://localhost:3000').replace(/\/$/, '');
+  const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  return (
+    process.env.PUBLIC_BASE_URL ||
+    (vercel ? `https://${vercel}` : 'http://localhost:3000')
+  ).replace(/\/$/, '');
 }
 
 interface ComplaintForSms {

@@ -24,7 +24,7 @@ StreetVoice sends and receives SMS through a spare Android phone running the fre
 
    ```bash
    curl -X POST -u "USERNAME:PASSWORD" -H "Content-Type: application/json" \
-     -d '{"url":"https://<your-app>.onrender.com/api/sms/incoming","event":"sms:received"}' \
+     -d '{"url":"https://<your-app>.vercel.app/api/sms/incoming","event":"sms:received"}' \
      https://api.sms-gate.app/3rdparty/v1/webhooks
    ```
 
