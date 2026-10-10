@@ -8,7 +8,11 @@
     "start": "next start",
     "lint": "eslint",
     "seed:officers": "tsx scripts/seed-officers.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "seed:demo": "tsx scripts/seed-demo-data.ts",
+    "make:prompts": "tsx scripts/make-prompts.ts",
+    "make:samples": "tsx scripts/make-samples.ts",
+    "try:analyzer": "tsx scripts/try-analyzer.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
