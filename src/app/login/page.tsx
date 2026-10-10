@@ -42,7 +42,7 @@ function LoginForm() {
     // Only follow same-site paths ("/admin"), never "//evil.com" or full URLs
     const requested = searchParams.get('redirect')
     const redirect =
-      requested && requested.startsWith('/') && !requested.startsWith('//') ? requested : '/portal'
+      requested && requested.startsWith('/') && !requested.startsWith('//') ? requested : '/admin'
     router.push(redirect)
     router.refresh()
   }

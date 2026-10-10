@@ -36,19 +36,25 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(url)
     }
 
-    // Admin route protection
-    if (pathname.startsWith('/admin')) {
-      const { data: officer } = await supabase
-        .from('officers')
-        .select('role')
-        .eq('id', user.id)
-        .single()
+    const { data: officer } = await supabase
+      .from('officers')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+    const isAdmin = officer?.role === 'admin'
 
-      if (!officer || officer.role !== 'admin') {
-        const url = request.nextUrl.clone()
-        url.pathname = '/portal'
-        return NextResponse.redirect(url)
-      }
+    // Admin route protection
+    if (pathname.startsWith('/admin') && !isAdmin) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/portal'
+      return NextResponse.redirect(url)
+    }
+
+    // Admins belong in the control room, not the department portal
+    if (pathname.startsWith('/portal') && isAdmin) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/admin'
+      return NextResponse.redirect(url)
     }
   }
 
