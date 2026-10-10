@@ -74,6 +74,7 @@ export interface ComplaintAnalysis {
   transcript_urdu: string;
   transcript_english: string;
   summary: string; // one line, English
+  summary_urdu: string; // the same line in Urdu, for the department SMS
   department_id: string | null;
   category: string; // department name, or 'unclassified'
   area: string | null; // locality / landmark mentioned by the caller

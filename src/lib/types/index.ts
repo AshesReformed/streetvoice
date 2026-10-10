@@ -4,6 +4,8 @@ export interface Department {
   keywords: string[];
   contact_info: string | null;
   description: string | null;
+  name_ur: string | null;
+  sms_number: string | null;
   created_at: string;
 }
 
@@ -35,6 +37,8 @@ export interface Complaint {
   transcript_urdu: string | null;
   transcript_english: string | null;
   summary: string | null;
+  summary_urdu: string | null;
+  dispatched_at: string | null;
   language: string | null;
   review_reason: string | null;
   confidence_score: number | null;

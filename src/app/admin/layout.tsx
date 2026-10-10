@@ -12,6 +12,7 @@ import {
   Building2,
   Users,
   ClipboardList,
+  MessageSquare,
   LogOut,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -21,6 +22,7 @@ const NAV_LINKS = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/complaints', label: 'All Complaints', icon: FileText },
   { href: '/admin/needs-review', label: 'Needs Review', icon: AlertTriangle },
+  { href: '/admin/sms', label: 'SMS', icon: MessageSquare },
   { href: '/admin/departments', label: 'Departments', icon: Building2 },
   { href: '/admin/officers', label: 'Officers', icon: Users },
   { href: '/admin/audit-log', label: 'Audit Log', icon: ClipboardList },

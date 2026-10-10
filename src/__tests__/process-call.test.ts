@@ -7,6 +7,10 @@ import { FakeDb } from './helpers/fake-supabase';
 vi.mock('next/server', () => ({ after: vi.fn() }));
 vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: vi.fn() }));
 vi.mock('@/lib/services', () => ({ getComplaintAnalyzer: vi.fn() }));
+vi.mock('@/lib/sms/notify', () => ({
+  notifyCitizen: vi.fn(async () => true),
+  announceRouted: vi.fn(async () => undefined),
+}));
 vi.mock('@/lib/recordings', () => ({
   storeRecording: vi.fn(async (id: string) => `storage://recordings/${id}.wav`),
   recordingUrl: vi.fn(async (url: string) => `https://signed.example.com/${url.split('/').pop()}`),
@@ -23,6 +27,8 @@ import {
 } from '@/lib/pipeline/process-call';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getComplaintAnalyzer } from '@/lib/services';
+import { announceRouted, notifyCitizen } from '@/lib/sms/notify';
+import { hashPhone } from '@/lib/sms/phone';
 
 const analyzeSpy = vi.fn();
 let db: FakeDb;
@@ -36,6 +42,7 @@ function analysis(overrides: Partial<ComplaintAnalysis> = {}): ComplaintAnalysis
     transcript_urdu: 'ہمارے محلے میں ٹرانسفارمر جل گیا ہے',
     transcript_english: 'The transformer in our neighbourhood has burnt out.',
     summary: 'Transformer burnt out in Model Town.',
+    summary_urdu: 'ماڈل ٹاؤن میں ٹرانسفارمر جل گیا۔',
     department_id: 'dept-electricity',
     category: 'Electricity',
     area: 'Model Town',
@@ -78,6 +85,10 @@ describe('fileComplaint', () => {
     expect(db.tables.call_logs[0]).toMatchObject({ language_selected: 'pa', complaint_id: row.id });
     expect(db.tables.status_history[0]).toMatchObject({ status: 'processing' });
     expect(db.tables.citizens).toHaveLength(1);
+    expect(db.tables.citizens[0]).toMatchObject({
+      phone: '+923001112233',
+      phone_hash: hashPhone('+923001112233'),
+    });
     expect(analyzeSpy).not.toHaveBeenCalled();
   });
 
@@ -126,6 +137,8 @@ describe('analyzeComplaint', () => {
       status: 'open',
       remark: 'Routed automatically to Electricity',
     });
+    // The department and the citizen are told by SMS
+    expect(announceRouted).toHaveBeenCalledWith(complaint_id);
   });
 
   it('holds an unclear complaint for review without a department', async () => {
@@ -140,6 +153,8 @@ describe('analyzeComplaint', () => {
       department_id: null,
       review_reason: 'Speech was unclear',
     });
+    // Nothing goes to a department until an admin routes it
+    expect(announceRouted).not.toHaveBeenCalled();
   });
 
   it('leaves a failed complaint processing for a retry, then gives up to manual review', async () => {
@@ -187,6 +202,15 @@ describe('processIncomingCall', () => {
 
     expect(complaintRow(filed.complaint_id).status).toBe('open');
     expect(after).not.toHaveBeenCalled();
+  });
+
+  it('texts the caller their tracking number before analyzing', async () => {
+    const filed = await processIncomingCall(call(13), { wait: true });
+
+    expect(notifyCitizen).toHaveBeenCalledWith(filed.complaint_id, 'filed');
+    expect(vi.mocked(notifyCitizen).mock.invocationCallOrder[0]).toBeLessThan(
+      analyzeSpy.mock.invocationCallOrder[0]
+    );
   });
 
   it('does not analyze a retried call twice', async () => {

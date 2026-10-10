@@ -2,6 +2,8 @@ import { after } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getComplaintAnalyzer } from '@/lib/services';
 import { recordingUrl, storeRecording } from '@/lib/recordings';
+import { announceRouted, notifyCitizen } from '@/lib/sms/notify';
+import { hashPhone, normalizePhone } from '@/lib/sms/phone';
 import { TelephonyWebhookInput, TelephonyWebhookOutput } from '@/lib/services/types';
 
 // ===========================================================================
@@ -56,11 +58,12 @@ export async function fileComplaint(payload: TelephonyWebhookInput): Promise<Fil
     };
   }
 
-  // Upsert citizen (if caller_id provided)
+  // Upsert citizen (if the caller's number is known). Returning callers are
+  // found by a keyed hash; the number itself is kept server-side for SMS.
   let citizenId: string | null = null;
-  if (payload.caller_id) {
-    // Hash the phone number for privacy (simple approach for MVP)
-    const phoneHash = payload.caller_id; // In production, use a proper hash
+  const phone = normalizePhone(payload.caller_id);
+  if (phone) {
+    const phoneHash = hashPhone(phone);
 
     const { data: existingCitizen } = await supabase
       .from('citizens')
@@ -73,7 +76,7 @@ export async function fileComplaint(payload: TelephonyWebhookInput): Promise<Fil
     } else {
       const { data: newCitizen } = await supabase
         .from('citizens')
-        .insert({ phone_hash: phoneHash, preferred_language: payload.dtmf_language ?? null })
+        .insert({ phone_hash: phoneHash, phone, preferred_language: payload.dtmf_language ?? null })
         .select('id')
         .single();
       citizenId = newCitizen?.id || null;
@@ -209,6 +212,7 @@ export async function analyzeComplaint(complaintId: string): Promise<AnalysisOut
         transcript_urdu: analysis.transcript_urdu,
         transcript_english: analysis.transcript_english,
         summary: analysis.summary,
+        summary_urdu: analysis.summary_urdu,
         language: analysis.language,
         confidence_score: analysis.confidence,
         priority: analysis.urgency,
@@ -225,6 +229,14 @@ export async function analyzeComplaint(complaintId: string): Promise<AnalysisOut
         ? `Held for review: ${analysis.review_reason ?? 'unclear'}`
         : `Routed automatically to ${analysis.category}`
     );
+
+    // 5. Routed: SMS the department (Urdu, no-login link) and the citizen
+    // (the complaint is already saved, so an SMS problem must not fail it)
+    if (!analysis.needs_review) {
+      await announceRouted(complaintId).catch((err) =>
+        console.error(`Routing SMS failed for complaint ${complaintId}:`, err)
+      );
+    }
 
     return {
       result: analysis.needs_review ? 'needs_review' : 'routed',
@@ -289,11 +301,16 @@ export async function processIncomingCall(
 ): Promise<FiledComplaint> {
   const filed = await fileComplaint(payload);
   if (filed.created) {
-    if (wait) {
+    // Confirm by SMS (the caller has the number in hand), then analyze
+    const followUp = async () => {
+      await notifyCitizen(filed.complaint_id, 'filed');
       await analyzeComplaint(filed.complaint_id);
+    };
+    if (wait) {
+      await followUp();
     } else {
       after(() =>
-        analyzeComplaint(filed.complaint_id).catch((err) =>
+        followUp().catch((err) =>
           console.error(`Background analysis crashed for ${filed.complaint_id}:`, err)
         )
       );

@@ -22,6 +22,7 @@ function modelResult(overrides: Record<string, unknown> = {}) {
     transcript_urdu: 'ہمارے گاؤں میں پانی نہیں ہے',
     transcript_english: 'There is no water in our village.',
     summary: 'No water supply in the village near Charsadda.',
+    summary_urdu: 'چارسدہ کے قریب گاؤں میں پانی نہیں۔',
     department: 'Water & Sanitation',
     area: 'Charsadda',
     urgency: 'high',
@@ -83,6 +84,7 @@ describe('GeminiComplaintAnalyzer', () => {
       transcript_urdu: 'ہمارے گاؤں میں پانی نہیں ہے',
       transcript_english: 'There is no water in our village.',
       summary: 'No water supply in the village near Charsadda.',
+      summary_urdu: 'چارسدہ کے قریب گاؤں میں پانی نہیں۔',
       department_id: 'dept-water',
       category: 'Water & Sanitation',
       area: 'Charsadda',
@@ -132,6 +134,23 @@ describe('GeminiComplaintAnalyzer', () => {
     vi.useRealTimers();
 
     expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(result.department_id).toBe('dept-water');
+  });
+
+  it('switches to the fallback model when the main one is overloaded', async () => {
+    fetchMock
+      .mockResolvedValueOnce(new Response(new Uint8Array([1]), { headers: { 'Content-Type': 'audio/wav' } }))
+      .mockResolvedValueOnce(new Response('high demand', { status: 503 }))
+      .mockResolvedValueOnce(geminiReply(modelResult()));
+
+    vi.useFakeTimers();
+    const pending = new GeminiComplaintAnalyzer().analyze({ audio_url: AUDIO_URL, departments: DEPARTMENTS });
+    await vi.runAllTimersAsync();
+    const result = await pending;
+    vi.useRealTimers();
+
+    expect(fetchMock.mock.calls[1][0]).toContain('/gemini-3.8-flash:generateContent');
+    expect(fetchMock.mock.calls[2][0]).toContain('/gemini-3.5-flash:generateContent');
     expect(result.department_id).toBe('dept-water');
   });
 

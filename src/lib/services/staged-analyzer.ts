@@ -59,6 +59,7 @@ export class StagedComplaintAnalyzer implements ComplaintAnalyzer {
       transcript_urdu: translationResult.urdu,
       transcript_english: translationResult.english,
       summary: translationResult.english,
+      summary_urdu: translationResult.urdu,
       department_id: classificationResult.department_id,
       category: classificationResult.category,
       area: null,

@@ -20,6 +20,7 @@ import {
 // ===========================================================================
 
 export const DEFAULT_GEMINI_MODEL = 'gemini-3.8-flash';
+export const DEFAULT_GEMINI_FALLBACK_MODEL = 'gemini-3.5-flash';
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 const REQUEST_TIMEOUT_MS = 90_000;
 // Inline audio must keep the whole request under Gemini's 20 MB limit.
@@ -60,6 +61,7 @@ Fill in every field of the JSON schema:
 - transcript_urdu: the complaint in Urdu script. If the caller spoke Urdu, repeat the transcript.
 - transcript_english: a faithful English translation.
 - summary: one plain English sentence of at most 25 words saying what the problem is and where.
+- summary_urdu: the same summary as one short Urdu sentence (at most 20 words) for a government officer reading an SMS.
 - department: exactly one department name from the list, or "${UNCLASSIFIED}" if none fits.
 - area: the neighbourhood, street, sector, village or landmark the caller mentions, written in English letters. Use null if no place is mentioned. Never invent a place.
 - urgency: "high" when there is danger to life or safety (sparking or fallen wires, open manholes, sewage entering homes, no water for several days, collapsed structures); "low" for minor inconveniences; otherwise "medium".
@@ -75,6 +77,7 @@ interface GeminiResult {
   transcript_urdu: string;
   transcript_english: string;
   summary: string;
+  summary_urdu: string;
   department: string;
   area: string | null;
   urgency: Urgency;
@@ -92,6 +95,7 @@ function responseSchema(departmentNames: string[]) {
       transcript_urdu: { type: 'STRING' },
       transcript_english: { type: 'STRING' },
       summary: { type: 'STRING' },
+      summary_urdu: { type: 'STRING' },
       department: { type: 'STRING', enum: [...departmentNames, UNCLASSIFIED] },
       area: { type: 'STRING', nullable: true },
       urgency: { type: 'STRING', enum: ['low', 'medium', 'high'] },
@@ -105,6 +109,7 @@ function responseSchema(departmentNames: string[]) {
       'transcript_urdu',
       'transcript_english',
       'summary',
+      'summary_urdu',
       'department',
       'area',
       'urgency',
@@ -118,6 +123,7 @@ function responseSchema(departmentNames: string[]) {
       'transcript_urdu',
       'transcript_english',
       'summary',
+      'summary_urdu',
       'department',
       'area',
       'urgency',
@@ -172,11 +178,15 @@ async function fetchAudio(url: string): Promise<{ data: string; mimeType: string
 async function callGemini(body: unknown): Promise<GeminiResult> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('Missing required environment variable: GEMINI_API_KEY');
-  const model = process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
+  const primary = process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
+  const fallback = process.env.GEMINI_FALLBACK_MODEL || DEFAULT_GEMINI_FALLBACK_MODEL;
+  // Rate limits, overload (503) and timeouts are retried: first on the
+  // fallback model (separate capacity and quota), then once more on the
+  // primary. The free tier hits all three now and then.
+  const models = [primary, fallback, primary];
 
-  // One retry on rate limits, server errors and timeouts — the free tier
-  // rate-limits and occasionally stalls on a request.
   for (let attempt = 1; ; attempt++) {
+    const model = models[attempt - 1];
     let response: Response;
     try {
       response = await fetch(`${API_BASE}/${model}:generateContent`, {
@@ -187,7 +197,7 @@ async function callGemini(body: unknown): Promise<GeminiResult> {
       });
     } catch (err) {
       const timedOut = err instanceof Error && err.name === 'TimeoutError';
-      if (!timedOut || attempt >= 2) throw err;
+      if (!timedOut || attempt >= models.length) throw err;
       continue;
     }
 
@@ -204,7 +214,7 @@ async function callGemini(body: unknown): Promise<GeminiResult> {
     }
 
     const retryable = response.status === 429 || response.status >= 500;
-    if (!retryable || attempt >= 2) {
+    if (!retryable || attempt >= models.length) {
       const detail = await response.text().catch(() => '');
       throw new Error(`Gemini request failed: HTTP ${response.status} ${detail.slice(0, 300)}`);
     }
@@ -244,6 +254,7 @@ export class GeminiComplaintAnalyzer implements ComplaintAnalyzer {
       transcript_urdu: result.transcript_urdu?.trim() ?? '',
       transcript_english: result.transcript_english?.trim() ?? '',
       summary: result.summary?.trim() ?? '',
+      summary_urdu: result.summary_urdu?.trim() ?? '',
       department_id: department?.id ?? null,
       category: department?.name ?? UNCLASSIFIED,
       area: result.area?.trim() || null,

@@ -22,6 +22,9 @@ export async function PATCH(
     if (data.name !== undefined) updatePayload.name = data.name;
     if (data.keywords !== undefined) updatePayload.keywords = data.keywords;
     if (data.contact_info !== undefined) updatePayload.contact_info = data.contact_info;
+    if (data.name_ur !== undefined) updatePayload.name_ur = data.name_ur;
+    if (data.description !== undefined) updatePayload.description = data.description;
+    if (data.sms_number !== undefined) updatePayload.sms_number = data.sms_number;
 
     const { data: department, error } = await supabase
       .from('departments')

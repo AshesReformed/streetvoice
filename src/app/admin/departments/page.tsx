@@ -25,9 +25,89 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
 import type { Department } from '@/lib/types'
+
+interface DepartmentForm {
+  name: string
+  nameUr: string
+  smsNumber: string
+  description: string
+  keywords: string
+}
+
+const EMPTY_FORM: DepartmentForm = { name: '', nameUr: '', smsNumber: '', description: '', keywords: '' }
+
+function toForm(dept: Department): DepartmentForm {
+  return {
+    name: dept.name,
+    nameUr: dept.name_ur || '',
+    smsNumber: dept.sms_number || '',
+    description: dept.description || '',
+    keywords: dept.keywords.join(', '),
+  }
+}
+
+function toPayload(form: DepartmentForm) {
+  return {
+    name: form.name.trim(),
+    name_ur: form.nameUr.trim() || null,
+    sms_number: form.smsNumber.trim() || null,
+    description: form.description.trim() || null,
+    keywords: form.keywords
+      .split(',')
+      .map((k) => k.trim())
+      .filter(Boolean),
+  }
+}
+
+function DepartmentFields({
+  form,
+  onChange,
+}: {
+  form: DepartmentForm
+  onChange: (form: DepartmentForm) => void
+}) {
+  const set = (key: keyof DepartmentForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+    onChange({ ...form, [key]: e.target.value })
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-muted-foreground">Name</label>
+          <Input placeholder="e.g. Electricity" value={form.name} onChange={set('name')} />
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-muted-foreground">Name in Urdu (for SMS)</label>
+          <Input dir="rtl" placeholder="مثلاً بجلی" value={form.nameUr} onChange={set('nameUr')} />
+        </div>
+      </div>
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-muted-foreground">SMS number</label>
+        <Input placeholder="e.g. 0300 1234567" value={form.smsNumber} onChange={set('smsNumber')} />
+        <p className="text-xs text-muted-foreground">
+          New complaints are sent here in Urdu. Replies from this number (&quot;482913 DONE&quot;) update the complaint.
+        </p>
+      </div>
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-muted-foreground">What this department handles</label>
+        <textarea
+          rows={3}
+          placeholder="e.g. Power outages, load-shedding, sparking transformers, fallen wires, meters and bills."
+          value={form.description}
+          onChange={set('description')}
+          className="w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+        />
+        <p className="text-xs text-muted-foreground">The AI reads this to decide which complaints belong here.</p>
+      </div>
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-muted-foreground">Fallback keywords (comma-separated)</label>
+        <Input placeholder="e.g. power, outage, transformer" value={form.keywords} onChange={set('keywords')} />
+      </div>
+    </div>
+  )
+}
 
 export default function DepartmentsPage() {
   const {
@@ -38,15 +118,10 @@ export default function DepartmentsPage() {
   } = useApi<Department[]>('/api/departments')
   const departments = departmentsData ?? []
 
-  // Dialog state
-  const [addOpen, setAddOpen] = useState(false)
-  const [editOpen, setEditOpen] = useState(false)
+  // Add / edit dialog: editingDept is null when adding
+  const [formOpen, setFormOpen] = useState(false)
   const [editingDept, setEditingDept] = useState<Department | null>(null)
-
-  // Form state
-  const [formName, setFormName] = useState('')
-  const [formKeywords, setFormKeywords] = useState('')
-  const [formContact, setFormContact] = useState('')
+  const [form, setForm] = useState<DepartmentForm>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
 
@@ -57,81 +132,37 @@ export default function DepartmentsPage() {
   const [deleteError, setDeleteError] = useState('')
 
   function openAdd() {
-    setFormName('')
-    setFormKeywords('')
-    setFormContact('')
+    setEditingDept(null)
+    setForm(EMPTY_FORM)
     setFormError('')
-    setAddOpen(true)
+    setFormOpen(true)
   }
 
   function openEdit(dept: Department) {
     setEditingDept(dept)
-    setFormName(dept.name)
-    setFormKeywords(dept.keywords.join(', '))
-    setFormContact(dept.contact_info || '')
+    setForm(toForm(dept))
     setFormError('')
-    setEditOpen(true)
+    setFormOpen(true)
   }
 
-  function parseKeywords(input: string): string[] {
-    return input
-      .split(',')
-      .map((k) => k.trim())
-      .filter(Boolean)
-  }
-
-  async function handleAdd() {
-    if (!formName.trim()) {
+  async function handleSave() {
+    if (!form.name.trim()) {
       setFormError('Name is required')
       return
     }
     setSaving(true)
     setFormError('')
     try {
-      const res = await fetch('/api/departments', {
-        method: 'POST',
+      const res = await fetch(editingDept ? `/api/departments/${editingDept.id}` : '/api/departments', {
+        method: editingDept ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: formName.trim(),
-          keywords: parseKeywords(formKeywords),
-          contact_info: formContact.trim() || null,
-        }),
+        body: JSON.stringify(toPayload(form)),
       })
       if (!res.ok) {
         const json = await res.json()
-        throw new Error(json.error || 'Failed to create')
+        throw new Error(json.error || 'Failed to save')
       }
-      setAddOpen(false)
-      reloadDepartments()
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Error')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function handleEdit() {
-    if (!editingDept || !formName.trim()) {
-      setFormError('Name is required')
-      return
-    }
-    setSaving(true)
-    setFormError('')
-    try {
-      const res = await fetch(`/api/departments/${editingDept.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: formName.trim(),
-          keywords: parseKeywords(formKeywords),
-          contact_info: formContact.trim() || null,
-        }),
-      })
-      if (!res.ok) {
-        const json = await res.json()
-        throw new Error(json.error || 'Failed to update')
-      }
-      setEditOpen(false)
+      setFormOpen(false)
       setEditingDept(null)
       reloadDepartments()
     } catch (err) {
@@ -171,7 +202,10 @@ export default function DepartmentsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Departments" description="Manage complaint departments and keywords">
+      <PageHeader
+        title="Departments"
+        description="Where complaints go: each department receives its complaints by SMS"
+      >
         <Button size="sm" onClick={openAdd}>
           <Plus size={14} />
           Add Department
@@ -197,8 +231,8 @@ export default function DepartmentsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>Keywords</TableHead>
-                  <TableHead>Contact Info</TableHead>
+                  <TableHead>SMS number</TableHead>
+                  <TableHead>What it handles</TableHead>
                   <TableHead className="w-16"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -212,19 +246,22 @@ export default function DepartmentsPage() {
                 ) : (
                   departments.map((dept) => (
                     <TableRow key={dept.id}>
-                      <TableCell className="font-medium">{dept.name}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {dept.keywords.length === 0 ? (
-                            <span className="text-muted-foreground">—</span>
-                          ) : (
-                            dept.keywords.map((kw, i) => (
-                              <Badge key={i} variant="secondary">{kw}</Badge>
-                            ))
-                          )}
-                        </div>
+                      <TableCell className="font-medium">
+                        {dept.name}
+                        {dept.name_ur && (
+                          <span dir="rtl" className="block text-xs font-normal text-muted-foreground">
+                            {dept.name_ur}
+                          </span>
+                        )}
                       </TableCell>
-                      <TableCell>{dept.contact_info || '—'}</TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {dept.sms_number || (
+                          <span className="font-sans text-amber-700">Not set: complaints are not sent</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="max-w-md whitespace-normal text-xs text-muted-foreground">
+                        {dept.description || dept.keywords.join(', ') || '—'}
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <Button variant="ghost" size="icon-xs" onClick={() => openEdit(dept)}>
@@ -251,88 +288,23 @@ export default function DepartmentsPage() {
         </Card>
       )}
 
-      {/* Add Dialog */}
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+      {/* Add / Edit Dialog */}
+      <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add Department</DialogTitle>
-            <DialogDescription>Create a new department for complaint routing.</DialogDescription>
+            <DialogTitle>{editingDept ? 'Edit Department' : 'Add Department'}</DialogTitle>
+            <DialogDescription>
+              {editingDept ? 'Update department details.' : 'Create a new department for complaint routing.'}
+            </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Name</label>
-              <Input
-                placeholder="e.g. Water & Sanitation"
-                value={formName}
-                onChange={(e) => setFormName(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Keywords (comma-separated)</label>
-              <Input
-                placeholder="e.g. water, sewage, drainage"
-                value={formKeywords}
-                onChange={(e) => setFormKeywords(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Contact Info</label>
-              <Input
-                placeholder="Phone or email"
-                value={formContact}
-                onChange={(e) => setFormContact(e.target.value)}
-              />
-            </div>
-            {formError && (
-              <p className="text-xs text-destructive">{formError}</p>
-            )}
-          </div>
+          <DepartmentFields form={form} onChange={setForm} />
+          {formError && (
+            <p className="text-xs text-destructive">{formError}</p>
+          )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
-            <Button onClick={handleAdd} disabled={saving}>
-              {saving ? 'Creating...' : 'Create'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Dialog */}
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Department</DialogTitle>
-            <DialogDescription>Update department details.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Name</label>
-              <Input
-                value={formName}
-                onChange={(e) => setFormName(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Keywords (comma-separated)</label>
-              <Input
-                value={formKeywords}
-                onChange={(e) => setFormKeywords(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Contact Info</label>
-              <Input
-                value={formContact}
-                onChange={(e) => setFormContact(e.target.value)}
-              />
-            </div>
-            {formError && (
-              <p className="text-xs text-destructive">{formError}</p>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
-            <Button onClick={handleEdit} disabled={saving}>
-              {saving ? 'Saving...' : 'Save Changes'}
+            <Button variant="outline" onClick={() => setFormOpen(false)}>Cancel</Button>
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? 'Saving...' : editingDept ? 'Save Changes' : 'Create'}
             </Button>
           </DialogFooter>
         </DialogContent>

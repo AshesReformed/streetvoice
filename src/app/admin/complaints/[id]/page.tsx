@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/page-header'
 import { StatusBadge } from '@/components/status-badge'
 import { PriorityBadge } from '@/components/priority-badge'
 import { StatusTimeline } from '@/components/status-timeline'
+import { SmsLog } from '@/components/sms-log'
 import {
   Card,
   CardHeader,
@@ -204,6 +205,28 @@ export default function ComplaintDetailPage() {
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Left: details */}
         <div className="space-y-6 lg:col-span-2">
+          {/* AI summary */}
+          {(complaint.summary || complaint.summary_urdu || complaint.review_reason) && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Summary</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {complaint.review_reason && complaint.status === 'needs_review' && (
+                  <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                    Held for review: {complaint.review_reason}
+                  </p>
+                )}
+                {complaint.summary && <p className="text-base font-medium">{complaint.summary}</p>}
+                {complaint.summary_urdu && (
+                  <p dir="rtl" className="text-base text-muted-foreground">
+                    {complaint.summary_urdu}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Complaint info */}
           <Card>
             <CardHeader>
@@ -229,6 +252,18 @@ export default function ComplaintDetailPage() {
                     {complaint.confidence_score != null
                       ? `${Math.round(complaint.confidence_score * 100)}%`
                       : '—'}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Language spoken</dt>
+                  <dd className="font-medium uppercase">{complaint.language || '—'}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Sent to department</dt>
+                  <dd className="font-medium">
+                    {complaint.dispatched_at
+                      ? format(new Date(complaint.dispatched_at), 'MMM d, h:mm a')
+                      : 'Not yet'}
                   </dd>
                 </div>
               </dl>
@@ -291,6 +326,16 @@ export default function ComplaintDetailPage() {
             </CardHeader>
             <CardContent>
               <StatusTimeline entries={statusHistory} />
+            </CardContent>
+          </Card>
+
+          {/* SMS to and from the citizen and department */}
+          <Card>
+            <CardHeader>
+              <CardTitle>SMS</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <SmsLog complaintId={complaint.id} />
             </CardContent>
           </Card>
         </div>

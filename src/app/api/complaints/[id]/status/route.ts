@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { requireAuth } from '@/lib/middleware/auth';
 import { validateBody } from '@/lib/middleware/validate';
 import { updateComplaintStatusSchema } from '@/lib/validation/schemas';
+import { announceStatus } from '@/lib/sms/notify';
 
 export async function PATCH(
   request: NextRequest,
@@ -53,6 +54,11 @@ export async function PATCH(
           .eq('id', latestHistory.id);
       }
     }
+
+    // Text the citizen when work starts or the complaint is resolved
+    await announceStatus(complaint.id, complaint.status).catch((err) =>
+      console.error('Status SMS failed:', err)
+    );
 
     return NextResponse.json({
       data: {

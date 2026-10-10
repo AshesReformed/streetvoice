@@ -1,4 +1,15 @@
 import { z } from 'zod';
+import { normalizePhone } from '@/lib/sms/phone';
+
+// Optional phone number: blank clears it, anything else must be a valid
+// number and is stored in E.164 form ("+923001234567").
+const optionalPhone = z
+  .string()
+  .trim()
+  .nullable()
+  .optional()
+  .refine((v) => !v || normalizePhone(v) !== null, 'Enter a valid phone number, e.g. 03001234567')
+  .transform((v) => (v === undefined ? undefined : v ? normalizePhone(v) : null));
 
 export const webhookPayloadSchema = z.object({
   call_ref: z.string(),
@@ -20,12 +31,18 @@ export const rerouteComplaintSchema = z.object({
 
 export const createDepartmentSchema = z.object({
   name: z.string().min(1),
+  name_ur: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  sms_number: optionalPhone,
   keywords: z.array(z.string()).default([]),
   contact_info: z.string().nullable().optional(),
 });
 
 export const updateDepartmentSchema = z.object({
   name: z.string().min(1).optional(),
+  name_ur: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  sms_number: optionalPhone,
   keywords: z.array(z.string()).optional(),
   contact_info: z.string().nullable().optional(),
 });
