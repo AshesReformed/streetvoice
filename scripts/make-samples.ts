@@ -1,6 +1,7 @@
 import { config } from 'dotenv';
 import { mkdirSync, writeFileSync } from 'fs';
 import path from 'path';
+import { pcmToWav, sleep, synthesize, TTS_PACING_MS } from './tts';
 
 // Generates demo complaint recordings with Gemini text-to-speech and saves
 // them as 8 kHz mono WAV (phone quality) in public/samples/. They feed the
@@ -12,7 +13,6 @@ import path from 'path';
 
 config({ path: '.env.local' });
 
-const TTS_MODEL = process.env.GEMINI_TTS_MODEL || 'gemini-3.8-flash-tts';
 const OUT_DIR = path.join(process.cwd(), 'public', 'samples');
 const PHONE_RATE = 8000;
 
@@ -54,72 +54,10 @@ export const SAMPLES: Record<string, { language: string; voice: string; text: st
   },
 };
 
-/** 16-bit PCM mono → WAV, decimated to phone quality. */
-function pcmToPhoneWav(pcm: Buffer, rate: number): Buffer {
-  const factor = Math.max(1, Math.round(rate / PHONE_RATE));
-  const inSamples = pcm.length / 2;
-  const outSamples = Math.floor(inSamples / factor);
-  const data = Buffer.alloc(outSamples * 2);
-  for (let i = 0; i < outSamples; i++) {
-    let sum = 0;
-    for (let j = 0; j < factor; j++) sum += pcm.readInt16LE((i * factor + j) * 2);
-    data.writeInt16LE(Math.round(sum / factor), i * 2);
-  }
-  const outRate = Math.round(rate / factor);
-  const header = Buffer.alloc(44);
-  header.write('RIFF', 0);
-  header.writeUInt32LE(36 + data.length, 4);
-  header.write('WAVE', 8);
-  header.write('fmt ', 12);
-  header.writeUInt32LE(16, 16);
-  header.writeUInt16LE(1, 20); // PCM
-  header.writeUInt16LE(1, 22); // mono
-  header.writeUInt32LE(outRate, 24);
-  header.writeUInt32LE(outRate * 2, 28);
-  header.writeUInt16LE(2, 32);
-  header.writeUInt16LE(16, 34);
-  header.write('data', 36);
-  header.writeUInt32LE(data.length, 40);
-  return Buffer.concat([header, data]);
-}
-
-async function synthesize(name: string): Promise<void> {
+async function makeSample(name: string): Promise<void> {
   const sample = SAMPLES[name];
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error('GEMINI_API_KEY must be set in .env.local');
-
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${TTS_MODEL}:generateContent`,
-    {
-      method: 'POST',
-      headers: { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              // Only the words to speak: style instructions get read out loud.
-              { text: sample.text },
-            ],
-          },
-        ],
-        generationConfig: {
-          responseModalities: ['AUDIO'],
-          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: sample.voice } } },
-        },
-      }),
-    }
-  );
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${(await response.text()).slice(0, 300)}`);
-  }
-  const json = await response.json();
-  const inline = json.candidates?.[0]?.content?.parts?.find(
-    (p: { inlineData?: { data: string; mimeType: string } }) => p.inlineData
-  )?.inlineData;
-  if (!inline) throw new Error('No audio in the response');
-
-  const rate = Number(/rate=(\d+)/.exec(inline.mimeType)?.[1] ?? 24000);
-  const wav = pcmToPhoneWav(Buffer.from(inline.data, 'base64'), rate);
+  const { pcm, rate } = await synthesize(sample.text, sample.voice);
+  const wav = pcmToWav(pcm, rate, PHONE_RATE);
   writeFileSync(path.join(OUT_DIR, `${name}.wav`), wav);
   console.log(`✓ ${name}.wav (${sample.language}, ${(wav.length / 1024).toFixed(0)} KB)`);
 }
@@ -133,9 +71,9 @@ async function main() {
       continue;
     }
     // The free tier allows 3 text-to-speech requests per minute.
-    if (i > 0) await new Promise((resolve) => setTimeout(resolve, 21_000));
+    if (i > 0) await sleep(TTS_PACING_MS);
     try {
-      await synthesize(name);
+      await makeSample(name);
     } catch (err) {
       console.error(`✗ ${name}: ${err instanceof Error ? err.message : String(err)}`);
     }

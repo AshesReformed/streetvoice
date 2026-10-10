@@ -52,9 +52,16 @@ export default function Home() {
           </CardContent>
         </Card>
 
+        <Link
+          href="/call"
+          className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-medium text-white hover:bg-emerald-700"
+        >
+          Call the complaint line in your browser
+        </Link>
+
         <p className="text-center text-xs text-zinc-400 dark:text-zinc-500">
           <Link href="/login" className="underline hover:text-zinc-600 dark:hover:text-zinc-300">
-            Officer/Admin Login
+            Control room login
           </Link>
         </p>
       </div>

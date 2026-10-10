@@ -72,6 +72,17 @@ export async function storeRecording(complaintId: string, sourceUrl: string): Pr
   return `${PREFIX}${path}`;
 }
 
+/** Save recording bytes we already have (e.g. a browser upload) under `name`. */
+export async function uploadRecording(name: string, bytes: Uint8Array, contentType: string): Promise<string> {
+  if (bytes.length === 0) throw new Error('Recording is empty');
+  if (bytes.length > MAX_BYTES) throw new Error(`Recording is too large (${bytes.length} bytes)`);
+  const { error } = await createAdminClient()
+    .storage.from(BUCKET)
+    .upload(name, bytes, { contentType, upsert: false });
+  if (error) throw new Error(`Failed to store recording: ${error.message}`);
+  return `${PREFIX}${name}`;
+}
+
 /**
  * A URL the recording can be fetched from: a signed link for stored
  * recordings (valid for `expiresIn` seconds), or the original URL.
