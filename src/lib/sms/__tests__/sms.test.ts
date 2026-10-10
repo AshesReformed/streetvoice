@@ -79,6 +79,7 @@ describe('handleIncomingSms', () => {
       status: 'open',
       department: { sms_number: DEPT_PHONE },
     });
+    db.tables.departments.push({ id: 'd1', name: 'Electricity', sms_number: DEPT_PHONE });
   });
 
   it('lets the department start and finish work, and tells the citizen', async () => {
@@ -123,7 +124,15 @@ describe('handleIncomingSms', () => {
     expect(result).toMatchObject({ action: 'not_found', reply: sms.notFound('111111') });
   });
 
-  it('explains the format for anything else', async () => {
+  it('ignores company senders and free text from unknown numbers', async () => {
+    expect((await handleIncomingSms('ZONG 5G', 'Your SMS bundle is now active')).action).toBe('ignored');
+    expect((await handleIncomingSms('03009998888', 'hello?')).action).toBe('ignored');
+    expect(sendSms).not.toHaveBeenCalled();
+    // Still logged for the control room
+    expect(db.tables.sms_messages.filter((m) => m.direction === 'in')).toHaveLength(2);
+  });
+
+  it('explains the format to a department that sends free text', async () => {
     const result = await handleIncomingSms(DEPT_PHONE, 'hello?');
 
     expect(result).toMatchObject({ action: 'help', reply: sms.help() });

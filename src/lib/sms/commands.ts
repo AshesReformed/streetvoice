@@ -38,7 +38,7 @@ export function parseCommand(text: string): ParsedCommand {
 }
 
 export interface IncomingSmsResult {
-  action: 'in_progress' | 'resolved' | 'status' | 'not_found' | 'forbidden' | 'help';
+  action: 'in_progress' | 'resolved' | 'status' | 'not_found' | 'forbidden' | 'help' | 'ignored';
   reply: string;
   complaintId?: string;
 }
@@ -46,7 +46,8 @@ export interface IncomingSmsResult {
 /** Handle one incoming SMS: log it, act on it, and reply to the sender. */
 export async function handleIncomingSms(from: string, text: string): Promise<IncomingSmsResult> {
   const supabase = createAdminClient();
-  const sender = normalizePhone(from) ?? from;
+  const phone = normalizePhone(from);
+  const sender = phone ?? from;
   const command = parseCommand(text);
 
   const complaint =
@@ -68,6 +69,20 @@ export async function handleIncomingSms(from: string, text: string): Promise<Inc
     complaint_id: complaint?.id ?? null,
     status: 'received',
   });
+
+  // Never answer company senders ("ZONG 5G", bundle notices): replies would
+  // fail or waste SMS. Free text only gets the help text if it comes from a
+  // department, so random messages to the gateway SIM go unanswered.
+  if (!phone) return { action: 'ignored', reply: '' };
+  if (command.kind === 'unknown') {
+    const { data: department } = await supabase
+      .from('departments')
+      .select('id')
+      .eq('sms_number', phone)
+      .limit(1)
+      .maybeSingle();
+    if (!department) return { action: 'ignored', reply: '' };
+  }
 
   let result: IncomingSmsResult;
   if (command.kind === 'unknown') {

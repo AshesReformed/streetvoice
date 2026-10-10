@@ -55,7 +55,7 @@ export class SmsGateProvider implements SmsProvider {
 }
 
 export function getSmsProvider(): SmsProvider {
-  switch (process.env.SMS_PROVIDER || 'mock') {
+  switch ((process.env.SMS_PROVIDER || 'mock').trim().toLowerCase()) {
     case 'android':
       return new SmsGateProvider();
     case 'mock':
