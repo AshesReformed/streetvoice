@@ -16,6 +16,11 @@ export async function GET() {
       timestamp: new Date().toISOString(),
       // Which SMS sender is active (mock or android): useful after changing env vars
       sms_provider: getSmsProvider().name,
+      // true when the Android gateway login is configured (values never shown)
+      sms_gateway_configured: Boolean(
+        process.env.SMS_GATEWAY_USERNAME && process.env.SMS_GATEWAY_PASSWORD
+      ),
+      sms_webhook_signed: Boolean(process.env.SMS_WEBHOOK_SIGNING_KEY),
     })
   } catch {
     return NextResponse.json({ status: 'unhealthy', error: 'Failed to connect to database' }, { status: 503 })
