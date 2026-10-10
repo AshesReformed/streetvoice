@@ -18,7 +18,7 @@ import { LANGUAGE_MENU } from '@/lib/twilio';
 // and can be switched off with SIMULATOR_ENABLED=false.
 // ===========================================================================
 
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 const MAX_AUDIO_BYTES = 5 * 1024 * 1024; // ~2.5 min of 16 kHz mono WAV
 const WINDOW_MS = 10 * 60 * 1000;

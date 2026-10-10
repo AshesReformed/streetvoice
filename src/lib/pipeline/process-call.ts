@@ -24,6 +24,9 @@ import { TelephonyWebhookInput, TelephonyWebhookOutput } from '@/lib/services/ty
 /** After this many failed analyses a complaint goes to manual review. */
 export const MAX_ANALYSIS_ATTEMPTS = 3;
 
+/** Pauses before the in-request retries of a failed analysis (attempts 2 and 3). */
+export const RETRY_DELAYS_MS = [20_000, 45_000];
+
 export interface FiledComplaint extends TelephonyWebhookOutput {
   complaint_id: string;
   /** false when this call_ref was already filed (a retried webhook) */
@@ -304,7 +307,14 @@ export async function processIncomingCall(
     // Confirm by SMS (the caller has the number in hand), then analyze
     const followUp = async () => {
       await notifyCitizen(filed.complaint_id, 'filed');
-      await analyzeComplaint(filed.complaint_id);
+      // The AI is sometimes briefly overloaded: wait and retry in the same
+      // background task, so one busy moment doesn't leave the call stuck
+      // until the retry sweep runs.
+      for (const delayMs of [0, ...RETRY_DELAYS_MS]) {
+        if (delayMs) await new Promise((resolve) => setTimeout(resolve, delayMs));
+        const outcome = await analyzeComplaint(filed.complaint_id);
+        if (outcome.result !== 'retry') break;
+      }
     };
     if (wait) {
       await followUp();

@@ -3,6 +3,9 @@ import { webhookPayloadSchema } from '@/lib/validation/schemas';
 import { processIncomingCall } from '@/lib/pipeline/process-call';
 import { config } from '@/lib/config';
 
+// Leaves time for the background AI analysis and its retries (after())
+export const maxDuration = 300;
+
 export async function POST(request: NextRequest) {
   try {
     // Validate webhook secret

@@ -40,6 +40,9 @@ import {
 
 const RECORDING_ACTION_URL = '/api/telephony/twilio/recording';
 
+// Leaves time for the background AI analysis and its retries (after())
+export const maxDuration = 300;
+
 export async function POST(request: NextRequest) {
   try {
     const params = parseFormParams(await request.text());

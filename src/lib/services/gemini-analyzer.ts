@@ -20,9 +20,10 @@ import {
 // ===========================================================================
 
 export const DEFAULT_GEMINI_MODEL = 'gemini-3.8-flash';
-export const DEFAULT_GEMINI_FALLBACK_MODEL = 'gemini-3.5-flash';
+// Comma-separated, tried in order when the primary is busy (override with GEMINI_FALLBACK_MODEL)
+export const DEFAULT_GEMINI_FALLBACK_MODEL = 'gemini-3.5-flash,gemini-3.6-flash,gemini-3.5-flash-lite';
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
-const REQUEST_TIMEOUT_MS = 90_000;
+const REQUEST_TIMEOUT_MS = 60_000;
 // Inline audio must keep the whole request under Gemini's 20 MB limit.
 const MAX_AUDIO_BYTES = 15 * 1024 * 1024;
 
@@ -179,11 +180,14 @@ async function callGemini(body: unknown): Promise<GeminiResult> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('Missing required environment variable: GEMINI_API_KEY');
   const primary = process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
-  const fallback = process.env.GEMINI_FALLBACK_MODEL || DEFAULT_GEMINI_FALLBACK_MODEL;
-  // Rate limits, overload (503) and timeouts are retried: first on the
-  // fallback model (separate capacity and quota), then once more on the
-  // primary. The free tier hits all three now and then.
-  const models = [primary, fallback, primary];
+  const fallbacks = (process.env.GEMINI_FALLBACK_MODEL || DEFAULT_GEMINI_FALLBACK_MODEL)
+    .split(',')
+    .map((m) => m.trim())
+    .filter(Boolean);
+  // Rate limits, overload (503) and timeouts move on to the next model in
+  // the chain (each has separate capacity and quota). The free tier hits all
+  // three now and then, sometimes for one model while others are fine.
+  const models = [primary, ...fallbacks.filter((m) => m !== primary)];
 
   for (let attempt = 1; ; attempt++) {
     const model = models[attempt - 1];
