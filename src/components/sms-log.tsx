@@ -28,6 +28,7 @@ const PURPOSE_LABELS: Record<string, string> = {
   command_done: 'Department: done',
   command_status: 'Status check',
   command_unknown: 'Unrecognised',
+  echo_ignored: 'Own message, ignored',
 }
 
 /** SMS in and out, newest first, refreshed every 5 seconds. */

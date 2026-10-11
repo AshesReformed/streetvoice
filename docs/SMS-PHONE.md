@@ -32,6 +32,8 @@ StreetVoice sends and receives SMS through a spare Android phone running the fre
 
 6. In the control room, open **Departments** and give each department an **SMS number**. For the demo, use a teammate's phone as "the Electricity department".
 
+   **Never use the gateway phone's own number** as a department or as the caller's number. The gateway would be texting itself. StreetVoice ignores its own messages and caps automatic replies, but those SMS still cost money and never reach a person.
+
 ## Test it
 
 1. Make a call at `/call` and enter your own number for SMS updates.

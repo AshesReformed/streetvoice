@@ -124,6 +124,40 @@ describe('handleIncomingSms', () => {
     expect(result).toMatchObject({ action: 'not_found', reply: sms.notFound('111111') });
   });
 
+  it('ignores its own messages coming back, so a phone texting itself cannot loop', async () => {
+    const ownText = sms.ackResolved('482913');
+    db.tables.sms_messages.push({
+      direction: 'out',
+      phone: DEPT_PHONE,
+      body: ownText,
+      created_at: new Date().toISOString(),
+    });
+
+    const result = await handleIncomingSms(DEPT_PHONE, ownText);
+
+    expect(result.action).toBe('ignored');
+    expect(sendSms).not.toHaveBeenCalled();
+    expect(announceStatus).not.toHaveBeenCalled();
+    expect(db.tables.sms_messages.at(-1)).toMatchObject({ direction: 'in', purpose: 'echo_ignored' });
+  });
+
+  it('stops replying to a number that has had several automatic replies recently', async () => {
+    for (let i = 0; i < 5; i++) {
+      db.tables.sms_messages.push({
+        direction: 'out',
+        phone: DEPT_PHONE,
+        purpose: 'command_reply',
+        body: `reply ${i}`,
+        created_at: new Date().toISOString(),
+      });
+    }
+
+    const result = await handleIncomingSms(DEPT_PHONE, '482913');
+
+    expect(result.action).toBe('ignored');
+    expect(sendSms).not.toHaveBeenCalled();
+  });
+
   it('ignores company senders and free text from unknown numbers', async () => {
     expect((await handleIncomingSms('ZONG 5G', 'Your SMS bundle is now active')).action).toBe('ignored');
     expect((await handleIncomingSms('03009998888', 'hello?')).action).toBe('ignored');

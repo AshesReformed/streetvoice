@@ -16,6 +16,7 @@ export class FakeDb {
     complaints: [],
     call_logs: [],
     status_history: [],
+    sms_messages: [],
   };
 
   from(table: string) {
@@ -61,6 +62,10 @@ class Query implements PromiseLike<{ data: unknown; error: null }> {
   }
   eq(col: string, value: unknown) {
     this.filters.push((row) => row[col] === value);
+    return this;
+  }
+  gte(col: string, value: string) {
+    this.filters.push((row) => String(row[col]) >= value);
     return this;
   }
   lt(col: string, value: string) {

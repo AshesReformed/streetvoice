@@ -15,7 +15,12 @@ import { normalizePhone, toAsciiDigits } from './phone';
 // sender's number must match that department's sms_number.
 // ===========================================================================
 
-const START_WORDS = ['ok', 'okay', 'start', 'started', 'شروع', 'ٹھیک', 'اوکے'];
+// Loop guards (see handleIncomingSms)
+const ECHO_WINDOW_MS = 60 * 60 * 1000;
+const REPLY_WINDOW_MS = 10 * 60 * 1000;
+const MAX_REPLIES_PER_WINDOW = 5;
+
+const START_WORDS =['ok', 'okay', 'start', 'started', 'شروع', 'ٹھیک', 'اوکے'];
 const DONE_WORDS = ['done', 'fixed', 'resolved', 'complete', 'completed', 'حل', 'مکمل', 'ختم'];
 
 export type ParsedCommand =
@@ -48,6 +53,31 @@ export async function handleIncomingSms(from: string, text: string): Promise<Inc
   const supabase = createAdminClient();
   const phone = normalizePhone(from);
   const sender = phone ?? from;
+
+  // Loop guard 1: one of our own messages coming back (e.g. the gateway SIM
+  // texting itself, or a phone that is both department and gateway). Our
+  // texts contain tracking numbers and words like DONE, so answering them
+  // would start an endless SMS ping-pong. Log and stop.
+  const recentCutoff = new Date(Date.now() - ECHO_WINDOW_MS).toISOString();
+  const { data: echo } = await supabase
+    .from('sms_messages')
+    .select('id')
+    .eq('direction', 'out')
+    .eq('body', text)
+    .gte('created_at', recentCutoff)
+    .limit(1)
+    .maybeSingle();
+  if (echo) {
+    await supabase.from('sms_messages').insert({
+      direction: 'in',
+      phone: sender,
+      body: text,
+      purpose: 'echo_ignored',
+      status: 'received',
+    });
+    return { action: 'ignored', reply: '' };
+  }
+
   const command = parseCommand(text);
 
   const complaint =
@@ -82,6 +112,19 @@ export async function handleIncomingSms(from: string, text: string): Promise<Inc
       .limit(1)
       .maybeSingle();
     if (!department) return { action: 'ignored', reply: '' };
+  }
+
+  // Loop guard 2: at most a few automatic replies per number in a short
+  // window, whatever they are replying to.
+  const { data: recentReplies } = await supabase
+    .from('sms_messages')
+    .select('id')
+    .eq('direction', 'out')
+    .eq('purpose', 'command_reply')
+    .eq('phone', phone)
+    .gte('created_at', new Date(Date.now() - REPLY_WINDOW_MS).toISOString());
+  if ((recentReplies?.length ?? 0) >= MAX_REPLIES_PER_WINDOW) {
+    return { action: 'ignored', reply: '' };
   }
 
   let result: IncomingSmsResult;
