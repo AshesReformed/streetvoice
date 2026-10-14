@@ -30,7 +30,7 @@ const supabase = createClient(supabaseUrl, serviceRoleKey, {
 // Demo account passwords come from .env.local, never from the repo. Re-running
 // the script resets existing accounts to these passwords, which is also how
 // to rotate them.
-const MIN_PASSWORD_LENGTH = 12;
+const MIN_PASSWORD_LENGTH = 8;
 const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? '';
 const officerPassword = process.env.SEED_OFFICER_PASSWORD ?? '';
 
