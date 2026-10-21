@@ -18,6 +18,7 @@ const STEPS = [
 const STEP_INDEX: Record<string, number> = {
   processing: 0,
   needs_review: 0,
+  spam: 0, // shown as "being checked", like needs_review
   open: 1,
   in_progress: 2,
   resolved: 3,
@@ -83,7 +84,7 @@ export default async function TrackPage({
 
   const current = STEP_INDEX[complaint.status] ?? 0;
   const dept = complaint.department as unknown as { name: string; name_ur: string | null } | null;
-  const underReview = complaint.status === "needs_review";
+  const underReview = complaint.status === "needs_review" || complaint.status === "spam";
 
   return (
     <div className="flex flex-1 items-center justify-center bg-zinc-50 px-4 py-8 dark:bg-zinc-950">

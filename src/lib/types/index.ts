@@ -42,7 +42,8 @@ export interface Complaint {
   language: string | null;
   review_reason: string | null;
   confidence_score: number | null;
-  status: 'processing' | 'needs_review' | 'open' | 'in_progress' | 'resolved';
+  status: 'processing' | 'needs_review' | 'open' | 'in_progress' | 'resolved' | 'spam';
+  spam_reason: string | null;
   priority: 'low' | 'medium' | 'high';
   area: string | null;
   assigned_officer_id: string | null;

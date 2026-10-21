@@ -21,6 +21,10 @@ const statusConfig: Record<string, { label: string; className: string }> = {
     label: 'Resolved',
     className: 'bg-emerald-100 text-emerald-800 border-emerald-200',
   },
+  spam: {
+    label: 'Spam',
+    className: 'bg-red-100 text-red-800 border-red-200',
+  },
 }
 
 export function StatusBadge({ status }: { status: string }) {

@@ -19,6 +19,7 @@ const STATUS_UR: Record<string, string> = {
   open: 'نئی',
   in_progress: 'کام جاری ہے',
   resolved: 'حل ہو گئی',
+  spam: 'جانچ جاری ہے',
 }
 
 export default async function DepartmentComplaintPage({

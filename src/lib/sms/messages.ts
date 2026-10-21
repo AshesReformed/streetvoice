@@ -1,7 +1,7 @@
 // Urdu SMS texts. Kept short: Urdu SMS are Unicode, so each part holds only
 // about 70 characters. The 6-digit tracking number is the key for everything.
 
-export type ComplaintStatus = 'processing' | 'needs_review' | 'open' | 'in_progress' | 'resolved';
+export type ComplaintStatus = 'processing' | 'needs_review' | 'open' | 'in_progress' | 'resolved' | 'spam';
 
 const STATUS_UR: Record<ComplaintStatus, string> = {
   processing: 'موصول ہو گئی، جانچ جاری ہے',
@@ -9,6 +9,8 @@ const STATUS_UR: Record<ComplaintStatus, string> = {
   open: 'محکمے کو بھیج دی گئی ہے',
   in_progress: 'اس پر کام جاری ہے',
   resolved: 'حل ہو گئی ہے',
+  // Never tell a spammer they were flagged
+  spam: 'جانچ جاری ہے',
 };
 
 export const sms = {

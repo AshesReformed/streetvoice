@@ -17,7 +17,7 @@ import {
 import { ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import type { Complaint, Department } from '@/lib/types'
 
-const STATUSES = ['', 'processing', 'needs_review', 'open', 'in_progress', 'resolved']
+const STATUSES = ['', 'processing', 'needs_review', 'open', 'in_progress', 'resolved', 'spam']
 const PRIORITIES = ['', 'low', 'medium', 'high']
 const PAGE_SIZE = 20
 

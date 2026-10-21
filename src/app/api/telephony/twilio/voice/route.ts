@@ -6,6 +6,8 @@ import {
   twimlResponse,
   validateTwilioWebhook,
 } from '@/lib/twilio';
+import { checkCaller } from '@/lib/abuse/guard';
+import { normalizePhone } from '@/lib/sms/phone';
 
 // ===========================================================================
 // Twilio voice webhook — the entry point for every phone call.
@@ -19,6 +21,9 @@ import {
 //           which receives the pressed digit and starts the recording.
 //   <Record> fallback for callers who press nothing — no language hint is
 //           passed, so the pipeline's ASR auto-detects from the audio.
+//
+// Before the greeting, the spam guard (lib/abuse/guard.ts) refuses blocked
+// numbers and callers over the limit.
 //
 // The recording callback on both <Record> verbs points at the recording
 // route below, which feeds the complaint into the existing
@@ -36,6 +41,16 @@ export async function POST(request: NextRequest) {
     const params = parseFormParams(await request.text());
     const rejection = validateTwilioWebhook(request, params);
     if (rejection) return rejection;
+
+    // Spam guard: blocked numbers and callers over the limit hear why and
+    // are hung up on before anything is recorded or sent to the AI.
+    const verdict = await checkCaller({ phone: normalizePhone(params.From), channel: 'twilio' });
+    if (!verdict.allowed) {
+      const refusal = new twiml.VoiceResponse();
+      refusal.say(verdict.message.en);
+      refusal.hangup();
+      return twimlResponse(refusal.toString());
+    }
 
     const response = new twiml.VoiceResponse();
 

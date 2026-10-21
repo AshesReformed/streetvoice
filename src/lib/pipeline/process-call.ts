@@ -4,6 +4,7 @@ import { getComplaintAnalyzer } from '@/lib/services';
 import { recordingUrl, storeRecording } from '@/lib/recordings';
 import { announceRouted, notifyCitizen } from '@/lib/sms/notify';
 import { hashPhone, normalizePhone } from '@/lib/sms/phone';
+import { autoBlockIfRepeatSpammer } from '@/lib/abuse/guard';
 import { TelephonyWebhookInput, TelephonyWebhookOutput } from '@/lib/services/types';
 
 // ===========================================================================
@@ -14,8 +15,9 @@ import { TelephonyWebhookInput, TelephonyWebhookOutput } from '@/lib/services/ty
 //    a second, so the caller hears it before hanging up.
 // 2. analyzeComplaint — runs after the response (Next.js after()) or from
 //    the retry sweep. Copies the recording into private storage, asks the AI
-//    analyzer what the complaint is, and routes it ('open') or holds it for
-//    an admin ('needs_review').
+//    analyzer what the complaint is, and routes it ('open'), holds it for
+//    an admin ('needs_review') or flags it as spam ('spam', never sent to a
+//    department; repeat spammers are blocked automatically).
 //
 // The AI takes 10–40 s per call; a phone webhook gives about 15 s, which is
 // why analysis can't happen while the caller waits.
@@ -127,6 +129,7 @@ export async function fileComplaint(payload: TelephonyWebhookInput): Promise<Fil
 
 export type AnalysisOutcome =
   | { result: 'routed' | 'needs_review'; department: string | null }
+  | { result: 'spam'; reason: string; caller_blocked: boolean }
   | { result: 'retry' | 'gave_up'; error: string }
   | { result: 'skipped' };
 
@@ -150,7 +153,7 @@ export async function analyzeComplaint(complaintId: string): Promise<AnalysisOut
 
   const { data: complaint } = await supabase
     .from('complaints')
-    .select('id, status, audio_url, processing_attempts')
+    .select('id, status, audio_url, processing_attempts, citizen_id')
     .eq('id', complaintId)
     .maybeSingle();
   if (!complaint || complaint.status !== 'processing' || !complaint.audio_url) {
@@ -201,9 +204,11 @@ export async function analyzeComplaint(complaintId: string): Promise<AnalysisOut
       })),
     });
 
-    // 4. Low-confidence gate: unclear complaints wait for an admin to route them
-    const status = analysis.needs_review ? 'needs_review' : 'open';
-    const departmentId = analysis.needs_review ? null : analysis.department_id;
+    // 4. Spam never reaches a department. Otherwise the low-confidence gate:
+    // unclear complaints wait for an admin to route them.
+    const spam = Boolean(analysis.is_spam);
+    const status = spam ? 'spam' : analysis.needs_review ? 'needs_review' : 'open';
+    const departmentId = spam || analysis.needs_review ? null : analysis.department_id;
 
     const { error: updateError } = await supabase
       .from('complaints')
@@ -221,10 +226,21 @@ export async function analyzeComplaint(complaintId: string): Promise<AnalysisOut
         priority: analysis.urgency,
         area: analysis.area,
         review_reason: analysis.review_reason,
+        spam_reason: spam ? analysis.spam_reason ?? 'Not a genuine complaint' : null,
         processing_error: null,
       })
       .eq('id', complaintId);
     if (updateError) throw new Error(`Failed to save analysis: ${updateError.message}`);
+
+    if (spam) {
+      const reason = analysis.spam_reason ?? 'Not a genuine complaint';
+      await remarkLatestHistory(complaintId, `Flagged as spam: ${reason}`);
+      const blocked = await autoBlockIfRepeatSpammer(complaint.citizen_id).catch((err) => {
+        console.error(`Auto-block check failed for complaint ${complaintId}:`, err);
+        return false;
+      });
+      return { result: 'spam', reason, caller_blocked: blocked };
+    }
 
     await remarkLatestHistory(
       complaintId,

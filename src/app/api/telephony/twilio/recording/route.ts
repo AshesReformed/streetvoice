@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { twiml } from 'twilio';
 import { processIncomingCall } from '@/lib/pipeline/process-call';
+import { recordAccepted } from '@/lib/abuse/guard';
+import { normalizePhone } from '@/lib/sms/phone';
 import { webhookPayloadSchema } from '@/lib/validation/schemas';
 import {
   digitToLanguage,
@@ -108,6 +110,10 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await processIncomingCall(parsed.data);
+    // Counts toward the caller's limit (checked by the voice route)
+    if (result.created) {
+      await recordAccepted({ phone: normalizePhone(params.From), channel: 'twilio' }, result.complaint_id);
+    }
 
     const confirmation = new twiml.VoiceResponse();
     confirmation.say(result.spoken_confirmation_text);

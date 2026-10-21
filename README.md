@@ -30,6 +30,7 @@ Citizen ◄── SMS when the complaint is registered, sent to the department,
 
 - **Departments need no new software and no login.** They get an Urdu SMS on a phone they already have, and reply by SMS. Only the department's own number can update its complaints.
 - **A control room** (web, for the team running the line) shows every complaint live. It catches the ones the AI wasn't sure about, and shows every SMS in and out.
+- **Spam and floods are stopped before they cost anything.** Each number can file a few complaints an hour, blocked numbers are refused before recording, and the AI labels pranks, abuse, silence and test calls as spam. Spam never reaches a department; repeat spammers are blocked automatically for 24 hours, and the control room can block or unblock any caller.
 - **Anyone can track a complaint** by number on the bilingual tracking page, or by texting the number.
 
 ## What's in this repo
@@ -44,6 +45,7 @@ Citizen ◄── SMS when the complaint is registered, sent to the department,
 | No-login department page | `src/app/c/[token]/` |
 | Public tracker (Urdu/English) | `src/app/track/[trackingId]/` |
 | Control room | `src/app/admin/` |
+| Spam and flood guard: limits per number and IP, blocklist, AI spam label | `src/lib/abuse/guard.ts`, `src/app/admin/flagged/` |
 | Database, security rules (Row-Level Security) | `supabase/migrations/` |
 | Offline fallback: self-hosted Whisper + NLLB + keyword routing | `src/lib/services/staged-analyzer.ts` |
 

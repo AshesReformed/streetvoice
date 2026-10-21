@@ -2,15 +2,21 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { createHmac } from 'crypto';
 
-// Only the pipeline is mocked — the real twilio SDK (validateRequest +
-// VoiceResponse) runs so signature validation is exercised for real.
+// Only the pipeline and the spam guard are mocked — the real twilio SDK
+// (validateRequest + VoiceResponse) runs so signature validation is
+// exercised for real.
 vi.mock('@/lib/pipeline/process-call', () => ({
   processIncomingCall: vi.fn(),
+}));
+vi.mock('@/lib/abuse/guard', () => ({
+  checkCaller: vi.fn(async () => ({ allowed: true })),
+  recordAccepted: vi.fn(async () => undefined),
 }));
 
 import { POST as voicePOST } from '@/app/api/telephony/twilio/voice/route';
 import { POST as recordingPOST } from '@/app/api/telephony/twilio/recording/route';
 import { processIncomingCall } from '@/lib/pipeline/process-call';
+import { checkCaller, recordAccepted } from '@/lib/abuse/guard';
 
 const mockProcessIncomingCall = vi.mocked(processIncomingCall);
 
@@ -121,6 +127,30 @@ describe('Twilio voice webhook', () => {
     expect(body).toContain('<Record');
     expect(body).toContain('maxLength="120"');
     expect(body).toContain('action="/api/telephony/twilio/recording"');
+
+    // The spam guard checked the caller's number first
+    expect(checkCaller).toHaveBeenCalledWith({ phone: '+923001234567', channel: 'twilio' });
+  });
+
+  it('hangs up on a blocked caller before recording anything', async () => {
+    vi.mocked(checkCaller).mockResolvedValueOnce({
+      allowed: false,
+      reason: 'blocked',
+      message: { ur: 'بند', en: 'Sorry, complaints from this number are temporarily blocked.' },
+    });
+    const res = await voicePOST(
+      signedRequest('/api/telephony/twilio/voice', {
+        CallSid: 'CA000000000000000000000000000009',
+        AccountSid: ACCOUNT_SID,
+        From: '+923001234567',
+        To: '+923217654321',
+      })
+    );
+    const body = await res.text();
+    expect(body).toContain('temporarily blocked');
+    expect(body).toContain('<Hangup/>');
+    expect(body).not.toContain('<Record');
+    expect(body).not.toContain('<Gather');
   });
 
   it('rejects a request without a signature header', async () => {
@@ -246,6 +276,9 @@ describe('Twilio recording webhook — completion phase', () => {
     expect(res.status).toBe(200);
     expect(res.headers.get('Content-Type')).toContain('text/xml');
     expect(body).toContain('SV-000001');
+
+    // Counts toward the caller's limit
+    expect(recordAccepted).toHaveBeenCalledWith({ phone: '+923001234567', channel: 'twilio' }, 'complaint-1');
   });
 
   it('omits dtmf_language when the caller never selected a language', async () => {

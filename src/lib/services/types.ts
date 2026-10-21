@@ -82,6 +82,10 @@ export interface ComplaintAnalysis {
   confidence: number; // 0..1, how sure the analyzer is of the routing
   needs_review: boolean;
   review_reason: string | null;
+  // Prank, abuse, silence, test call...: never sent to a department.
+  // Optional: analyzers that can't judge it (staged, mock) leave it out.
+  is_spam?: boolean;
+  spam_reason?: string | null;
 }
 
 export interface ComplaintAnalyzer {

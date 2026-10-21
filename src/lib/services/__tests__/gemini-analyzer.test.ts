@@ -29,6 +29,8 @@ function modelResult(overrides: Record<string, unknown> = {}) {
     confidence: 0.9,
     needs_review: false,
     review_reason: null,
+    is_spam: false,
+    spam_reason: null,
     ...overrides,
   };
 }
@@ -92,7 +94,21 @@ describe('GeminiComplaintAnalyzer', () => {
       confidence: 0.9,
       needs_review: false,
       review_reason: null,
+      is_spam: false,
+      spam_reason: null,
     });
+  });
+
+  it('passes on the spam label with a reason', async () => {
+    stubAudioThen(
+      geminiReply(modelResult({ is_spam: true, spam_reason: 'Prank call', needs_review: true, review_reason: 'Prank' }))
+    );
+    const result = await new GeminiComplaintAnalyzer().analyze({ audio_url: AUDIO_URL, departments: DEPARTMENTS });
+    expect(result).toMatchObject({ is_spam: true, spam_reason: 'Prank call', needs_review: true });
+
+    stubAudioThen(geminiReply(modelResult({ is_spam: true, spam_reason: null })));
+    const unexplained = await new GeminiComplaintAnalyzer().analyze({ audio_url: AUDIO_URL, departments: DEPARTMENTS });
+    expect(unexplained.spam_reason).toBe('Not a genuine complaint');
   });
 
   it('sends unclassified complaints to review', async () => {
@@ -189,7 +205,8 @@ describe('GeminiComplaintAnalyzer', () => {
 
 describe('audioMimeType', () => {
   it('prefers an audio content-type header', () => {
-    expect(audioMimeType('audio/mpeg; charset=binary', 'https://x.test/a.wav')).toBe('audio/mpeg');
+    expect(audioMimeType('audio/mpeg; charset=binary', 'https://x.test/a.wav')).toBe('audio/mp3');
+    expect(audioMimeType('audio/ogg', 'https://x.test/a.wav')).toBe('audio/ogg');
   });
 
   it('falls back to the file extension', () => {

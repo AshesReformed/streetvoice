@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { encodeWav } from '@/lib/audio/wav';
+import { encodeMp3, encodeWav } from '@/lib/audio/wav';
 
 describe('encodeWav', () => {
   it('writes a valid 16-bit mono PCM WAV header and clamps samples', () => {
@@ -19,5 +19,21 @@ describe('encodeWav', () => {
 
     const samples = Array.from({ length: 6 }, (_, i) => view.getInt16(44 + i * 2, true));
     expect(samples).toEqual([0, 32767, -32768, 32767, -32768, 16383]);
+  });
+});
+
+describe('encodeMp3', () => {
+  it('produces MP3 frames about 8 times smaller than WAV', () => {
+    const seconds = 3;
+    const samples = new Float32Array(16000 * seconds).map((_, i) => 0.3 * Math.sin((2 * Math.PI * 440 * i) / 16000));
+    const mp3 = encodeMp3(samples, 16000);
+
+    // MPEG frame sync: 11 set bits
+    expect(mp3[0]).toBe(0xff);
+    expect(mp3[1] & 0xe0).toBe(0xe0);
+    // 32 kbps = 4 KB a second, WAV = 32 KB a second
+    expect(mp3.length).toBeGreaterThan(3_000 * seconds);
+    expect(mp3.length).toBeLessThan(5_000 * seconds);
+    expect(encodeWav(samples, 16000).length / mp3.length).toBeGreaterThan(6);
   });
 });

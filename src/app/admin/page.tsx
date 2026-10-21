@@ -130,6 +130,7 @@ export default function AdminDashboard() {
     { label: 'Open', value: summary.by_status.open ?? 0 },
     { label: 'In Progress', value: summary.by_status.in_progress ?? 0 },
     { label: 'Resolved', value: summary.by_status.resolved ?? 0 },
+    { label: 'Flagged as Spam', value: summary.by_status.spam ?? 0 },
     {
       label: 'Avg Resolution',
       value: summary.avg_resolution_hours != null ? `${summary.avg_resolution_hours}h` : '—',

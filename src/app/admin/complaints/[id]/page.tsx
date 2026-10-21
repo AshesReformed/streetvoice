@@ -9,6 +9,7 @@ import { StatusBadge } from '@/components/status-badge'
 import { PriorityBadge } from '@/components/priority-badge'
 import { StatusTimeline } from '@/components/status-timeline'
 import { SmsLog } from '@/components/sms-log'
+import { CallerCard } from '@/components/caller-card'
 import {
   Card,
   CardHeader,
@@ -91,6 +92,22 @@ export default function ComplaintDetailPage() {
     }
     fetchAll()
   }, [id])
+
+  async function refreshComplaint() {
+    const supabase = createClient()
+    const { data: comp } = await supabase
+      .from('complaints')
+      .select('*, department:departments(name)')
+      .eq('id', id)
+      .single()
+    if (comp) setComplaint(comp as unknown as Complaint)
+    const { data: history } = await supabase
+      .from('status_history')
+      .select('*, officer:officers(full_name)')
+      .eq('complaint_id', id)
+      .order('created_at', { ascending: false })
+    setStatusHistory((history || []) as unknown as StatusHistory[])
+  }
 
   async function handleReroute() {
     if (!selectedDeptId || !complaint) return
@@ -206,12 +223,18 @@ export default function ComplaintDetailPage() {
         {/* Left: details */}
         <div className="space-y-6 lg:col-span-2">
           {/* AI summary */}
-          {(complaint.summary || complaint.summary_urdu || complaint.review_reason) && (
+          {(complaint.summary || complaint.summary_urdu || complaint.review_reason || complaint.spam_reason) && (
             <Card>
               <CardHeader>
                 <CardTitle>Summary</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
+                {complaint.status === 'spam' && (
+                  <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                    Flagged as spam: {complaint.spam_reason || 'not a genuine complaint'}. Not sent to any
+                    department.
+                  </p>
+                )}
                 {complaint.review_reason && complaint.status === 'needs_review' && (
                   <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
                     Held for review: {complaint.review_reason}
@@ -342,6 +365,8 @@ export default function ComplaintDetailPage() {
 
         {/* Right: actions */}
         <div className="space-y-6">
+          <CallerCard complaintId={complaint.id} status={complaint.status} onChanged={refreshComplaint} />
+
           {/* Re-route */}
           <Card>
             <CardHeader>

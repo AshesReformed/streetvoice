@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
       open: 0,
       in_progress: 0,
       resolved: 0,
+      spam: 0,
     };
     for (const c of complaints) {
       if (c.status in byStatus) {

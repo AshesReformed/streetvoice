@@ -60,3 +60,14 @@ export const createOfficerSchema = z.object({
   role: z.enum(['officer', 'admin']),
   department_id: z.string().uuid().nullable().optional(),
 });
+
+// Block a complaint's caller; hours = null blocks until someone unblocks
+export const blockCallerSchema = z.object({
+  hours: z.number().int().positive().max(24 * 365).nullable().optional(),
+  reason: z.string().trim().max(200).optional(),
+});
+
+export const markSpamSchema = z.object({
+  spam: z.boolean(),
+  reason: z.string().trim().max(200).optional(),
+});

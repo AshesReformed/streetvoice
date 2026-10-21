@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Phone, PhoneOff } from 'lucide-react'
-import { blobToWav } from '@/lib/audio/wav'
+import { blobToMp3, blobToWav } from '@/lib/audio/wav'
 import { cn } from '@/lib/utils'
 
 // ===========================================================================
@@ -54,6 +54,23 @@ const CAPTIONS: Record<string, { ur: string; en: string }> = {
 type Phase = 'idle' | 'connecting' | 'menu' | 'recording' | 'sending' | 'done' | 'error'
 
 class HungUp extends Error {}
+
+/** Refused by the server (spam guard): carries the bilingual message. */
+class Refused extends Error {
+  constructor(public caption: { ur: string; en: string }) {
+    super(caption.en)
+  }
+}
+
+/** Compress to MP3 (about 8x smaller); fall back to WAV if encoding fails. */
+async function compress(recording: Blob): Promise<{ blob: Blob; name: string }> {
+  try {
+    return { blob: await blobToMp3(recording), name: 'call.mp3' }
+  } catch (err) {
+    console.warn('MP3 encoding failed, sending WAV:', err)
+    return { blob: await blobToWav(recording), name: 'call.wav' }
+  }
+}
 
 export default function CallPage() {
   const [phase, setPhase] = useState<Phase>('idle')
@@ -203,13 +220,14 @@ export default function CallPage() {
       // File it through the real pipeline
       setPhase('sending')
       setCaption(null)
-      const wav = await blobToWav(recording)
+      const audio = await compress(recording)
       const form = new FormData()
-      form.append('audio', wav, 'call.wav')
+      form.append('audio', audio.blob, audio.name)
       if (choice) form.append('language', choice.code)
       if (phone.trim()) form.append('phone', phone.trim())
       const res = await fetch('/api/simulator/call', { method: 'POST', body: form })
       const json = await res.json().catch(() => ({}))
+      if (!res.ok && json.error_ur) throw new Refused({ ur: json.error_ur, en: json.error })
       if (!res.ok) throw new Error(json.error || 'Could not file the complaint')
       checkLine()
 
@@ -230,8 +248,14 @@ export default function CallPage() {
           : err instanceof Error
             ? err.message
             : 'Something went wrong'
-      setErrorText(message)
       setPhase('error')
+      if (err instanceof Refused) {
+        // Spam guard: show why instead of the generic apology
+        setErrorText(null)
+        setCaption(err.caption)
+        return
+      }
+      setErrorText(message)
       setCaption(CAPTIONS.error)
       await playPrompt('error').catch(() => undefined)
     }
@@ -281,8 +305,9 @@ export default function CallPage() {
             <div className="mt-4 flex flex-1 flex-col justify-center gap-3 text-center">
               {phase === 'idle' && (
                 <div className="space-y-2 text-left">
-                  <label htmlFor="phone" className="block text-xs text-emerald-100/80">
-                    Your mobile number for SMS updates (optional)
+                  <label htmlFor="phone" className="flex justify-between text-xs text-emerald-100/80">
+                    <span>Calling from</span>
+                    <span dir="rtl">آپ کا موبائل نمبر</span>
                   </label>
                   <input
                     id="phone"
@@ -292,6 +317,10 @@ export default function CallPage() {
                     onChange={(e) => setPhone(e.target.value)}
                     className="w-full rounded-lg bg-white/10 px-3 py-2 text-center font-mono text-lg tracking-wider outline-none placeholder:text-white/30 focus:ring-2 focus:ring-emerald-400"
                   />
+                  <p className="text-[11px] leading-snug text-white/50">
+                    On a real phone line your number is detected automatically (caller ID). In this browser
+                    demo, type it to get SMS updates.
+                  </p>
                 </div>
               )}
 
@@ -316,6 +345,9 @@ export default function CallPage() {
                 <div className="space-y-2">
                   <p className="text-xs text-white/60">شکایت نمبر · Complaint number</p>
                   <p className="font-mono text-4xl font-bold tracking-[0.3em]">{trackingId}</p>
+                  {!phone.trim() && (
+                    <p className="text-xs text-white/50">No number given, so no SMS updates.</p>
+                  )}
                   <Link
                     href={`/track/${trackingId}`}
                     className="inline-block rounded-full bg-white/10 px-4 py-1.5 text-sm hover:bg-white/20"

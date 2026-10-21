@@ -14,6 +14,7 @@ import {
   ClipboardList,
   MessageSquare,
   LogOut,
+  ShieldAlert,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -22,6 +23,7 @@ const NAV_LINKS = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/complaints', label: 'All Complaints', icon: FileText },
   { href: '/admin/needs-review', label: 'Needs Review', icon: AlertTriangle },
+  { href: '/admin/flagged', label: 'Flagged', icon: ShieldAlert },
   { href: '/admin/sms', label: 'SMS', icon: MessageSquare },
   { href: '/admin/departments', label: 'Departments', icon: Building2 },
   { href: '/admin/officers', label: 'Officers', icon: Users },
