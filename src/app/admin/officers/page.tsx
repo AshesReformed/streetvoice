@@ -37,6 +37,11 @@ import { Badge } from '@/components/ui/badge'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
 import type { Officer, Department } from '@/lib/types'
 
+const ROLE_ITEMS = [
+  { value: 'officer', label: 'Officer' },
+  { value: 'admin', label: 'Admin' },
+]
+
 export default function OfficersPage() {
   const {
     data: officersData,
@@ -317,7 +322,7 @@ export default function OfficersPage() {
             </div>
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground">Role</label>
-              <Select value={formRole} onValueChange={(v: string | null) => setFormRole((v ?? 'officer') as 'officer' | 'admin')}>
+              <Select items={ROLE_ITEMS} value={formRole} onValueChange={(v: string | null) => setFormRole((v ?? 'officer') as 'officer' | 'admin')}>
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
@@ -330,7 +335,7 @@ export default function OfficersPage() {
             {formRole === 'officer' && (
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Department</label>
-                <Select value={formDeptId} onValueChange={(v: string | null) => setFormDeptId(v ?? '')}>
+                <Select items={departments.map((d) => ({ value: d.id, label: d.name }))} value={formDeptId} onValueChange={(v: string | null) => setFormDeptId(v ?? '')}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select department" />
                   </SelectTrigger>
@@ -372,7 +377,7 @@ export default function OfficersPage() {
             </div>
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground">Role</label>
-              <Select value={editRole} onValueChange={(v: string | null) => setEditRole((v ?? 'officer') as 'officer' | 'admin')}>
+              <Select items={ROLE_ITEMS} value={editRole} onValueChange={(v: string | null) => setEditRole((v ?? 'officer') as 'officer' | 'admin')}>
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
@@ -385,7 +390,7 @@ export default function OfficersPage() {
             {editRole === 'officer' && (
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Department</label>
-                <Select value={editDeptId} onValueChange={(v: string | null) => setEditDeptId(v ?? '')}>
+                <Select items={departments.map((d) => ({ value: d.id, label: d.name }))} value={editDeptId} onValueChange={(v: string | null) => setEditDeptId(v ?? '')}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select department" />
                   </SelectTrigger>

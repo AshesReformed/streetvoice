@@ -41,17 +41,21 @@ export function AlertBanner() {
   if (!data?.length) return null
 
   return (
-    <div className="space-y-2 border-b bg-red-50 px-6 py-3" role="alert">
+    <div className="space-y-2 border-b border-red-200 bg-red-50/80 px-4 py-2.5 sm:px-6 lg:px-8" role="alert">
       {data.map((a) => (
-        <div key={a.id} className="flex items-start gap-3 text-sm text-red-800">
-          <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-          <p className="flex-1">
-            <span className="font-semibold">{TITLES[a.kind] ?? 'Alert'}:</span> {a.message}{' '}
-            <span className="text-red-700/70">{formatDistanceToNow(new Date(a.created_at))} ago</span>
+        <div key={a.id} className="flex items-start gap-3 text-sm text-red-900">
+          <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-red-600 text-white">
+            <AlertTriangle size={12} strokeWidth={2.5} />
+          </span>
+          <p className="min-w-0 flex-1 leading-relaxed">
+            <span className="font-semibold">{TITLES[a.kind] ?? 'Alert'}</span>
+            <span className="text-red-900/50"> · {formatDistanceToNow(new Date(a.created_at))} ago</span>
+            <span className="block text-red-900/80 sm:inline sm:before:content-['_—_']">{a.message}</span>
           </p>
           <Button
             variant="ghost"
             size="icon-sm"
+            className="shrink-0 text-red-900/60 hover:bg-red-100 hover:text-red-900"
             aria-label="Dismiss alert"
             disabled={dismissing === a.id}
             onClick={() => dismiss(a.id)}

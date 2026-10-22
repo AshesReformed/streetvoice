@@ -19,6 +19,14 @@ import type { Complaint, Department } from '@/lib/types'
 
 const STATUSES = ['', 'processing', 'needs_review', 'open', 'in_progress', 'resolved', 'spam']
 const PRIORITIES = ['', 'low', 'medium', 'high']
+const STATUS_LABELS: Record<string, string> = {
+  processing: 'With the AI',
+  needs_review: 'Needs review',
+  open: 'Open',
+  in_progress: 'In progress',
+  resolved: 'Resolved',
+  spam: 'Spam',
+}
 const PAGE_SIZE = 20
 
 // useSearchParams needs a Suspense boundary for the static build
@@ -36,7 +44,7 @@ function AllComplaints() {
   const [page, setPage] = useState(1)
 
   // Filters
-  const [status, setStatus] = useState('')
+  const [status, setStatus] = useState(searchParams.get('status') ?? '')
   const [priority, setPriority] = useState('')
   const [departmentId, setDepartmentId] = useState('')
   const [areaSearch, setAreaSearch] = useState('')
@@ -78,83 +86,84 @@ function AllComplaints() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="All Complaints"
-        description={`${total} total complaints`}
+        title="All complaints"
+        description={`${total} complaint${total === 1 ? '' : 's'}${hasFilters ? ' match these filters' : ''}`}
       />
 
       {/* Filters */}
-      <div className="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-3">
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-muted-foreground">Status</label>
-          <Select value={status} onValueChange={(v: string | null) => { setStatus(v ?? ''); setPage(1) }}>
-            <SelectTrigger className="w-36">
-              <SelectValue placeholder="All statuses" />
-            </SelectTrigger>
-            <SelectContent>
-              {STATUSES.map((s) => (
-                <SelectItem key={s || 'all'} value={s}>
-                  {s ? s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : 'All statuses'}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative w-full sm:w-56">
+          <Search size={15} className="absolute top-1/2 left-2.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search area…"
+            aria-label="Search area"
+            value={areaSearch}
+            onChange={(e) => { setAreaSearch(e.target.value); setPage(1) }}
+            className="h-9 bg-card pl-8"
+          />
         </div>
 
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-muted-foreground">Priority</label>
-          <Select value={priority} onValueChange={(v: string | null) => { setPriority(v ?? ''); setPage(1) }}>
-            <SelectTrigger className="w-32">
-              <SelectValue placeholder="All priorities" />
-            </SelectTrigger>
-            <SelectContent>
-              {PRIORITIES.map((p) => (
-                <SelectItem key={p || 'all'} value={p}>
-                  {p ? p.charAt(0).toUpperCase() + p.slice(1) : 'All priorities'}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <Select
+          items={STATUSES.map((s) => ({ value: s, label: s ? STATUS_LABELS[s] : 'All statuses' }))}
+          value={status}
+          onValueChange={(v: string | null) => { setStatus(v ?? ''); setPage(1) }}
+        >
+          <SelectTrigger className="h-9 w-40 bg-card" aria-label="Status">
+            <SelectValue placeholder="All statuses" />
+          </SelectTrigger>
+          <SelectContent>
+            {STATUSES.map((s) => (
+              <SelectItem key={s || 'all'} value={s}>
+                {s ? STATUS_LABELS[s] : 'All statuses'}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-muted-foreground">Department</label>
-          <Select value={departmentId} onValueChange={(v: string | null) => { setDepartmentId(v ?? ''); setPage(1) }}>
-            <SelectTrigger className="w-44">
-              <SelectValue placeholder="All departments" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">All departments</SelectItem>
-              {departments.map((d) => (
-                <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <Select
+          items={PRIORITIES.map((p) => ({ value: p, label: p ? p.charAt(0).toUpperCase() + p.slice(1) : 'All priorities' }))}
+          value={priority}
+          onValueChange={(v: string | null) => { setPriority(v ?? ''); setPage(1) }}
+        >
+          <SelectTrigger className="h-9 w-36 bg-card" aria-label="Priority">
+            <SelectValue placeholder="All priorities" />
+          </SelectTrigger>
+          <SelectContent>
+            {PRIORITIES.map((p) => (
+              <SelectItem key={p || 'all'} value={p}>
+                {p ? p.charAt(0).toUpperCase() + p.slice(1) : 'All priorities'}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-muted-foreground">Area</label>
-          <div className="relative">
-            <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search area..."
-              value={areaSearch}
-              onChange={(e) => { setAreaSearch(e.target.value); setPage(1) }}
-              className="w-40 pl-7"
-            />
-          </div>
-        </div>
+        <Select
+          items={[{ value: '', label: 'All departments' }, ...departments.map((d) => ({ value: d.id, label: d.name }))]}
+          value={departmentId}
+          onValueChange={(v: string | null) => { setDepartmentId(v ?? ''); setPage(1) }}
+        >
+          <SelectTrigger className="h-9 w-48 bg-card" aria-label="Department">
+            <SelectValue placeholder="All departments" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">All departments</SelectItem>
+            {departments.map((d) => (
+              <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
         <Button
           variant={overdue ? 'default' : 'outline'}
-          size="sm"
+          className={overdue ? 'h-9' : 'h-9 bg-card'}
           onClick={() => { setOverdue((v) => !v); setPage(1) }}
         >
           Overdue only
         </Button>
 
         {hasFilters && (
-          <Button variant="ghost" size="sm" onClick={handleResetFilters}>
-            Clear
+          <Button variant="ghost" className="h-9" onClick={handleResetFilters}>
+            Clear filters
           </Button>
         )}
       </div>

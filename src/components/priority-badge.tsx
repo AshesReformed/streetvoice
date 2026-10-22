@@ -3,11 +3,11 @@ import { Badge } from '@/components/ui/badge'
 const priorityConfig: Record<string, { label: string; className: string }> = {
   low: {
     label: 'Low',
-    className: 'bg-gray-100 text-gray-700 border-gray-200',
+    className: 'bg-slate-100 text-slate-600 border-slate-200',
   },
   medium: {
     label: 'Medium',
-    className: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+    className: 'bg-amber-100 text-amber-800 border-amber-200',
   },
   high: {
     label: 'High',
@@ -22,7 +22,8 @@ export function PriorityBadge({ priority }: { priority: string }) {
   }
 
   return (
-    <Badge variant="outline" className={config.className}>
+    <Badge variant="outline" className={`gap-1.5 rounded-full border-transparent px-2 font-medium ${config.className}`}>
+      <span className="size-1.5 rounded-full bg-current opacity-70" />
       {config.label}
     </Badge>
   )

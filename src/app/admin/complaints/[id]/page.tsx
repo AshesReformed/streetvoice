@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { createClient } from '@/lib/supabase/client'
@@ -27,9 +28,16 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { ArrowLeft, Save } from 'lucide-react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { Complaint, StatusHistory, Department } from '@/lib/types'
 
 const STATUSES = ['needs_review', 'open', 'in_progress', 'resolved']
+const STATUS_LABELS: Record<string, string> = {
+  needs_review: 'Needs review',
+  open: 'Open',
+  in_progress: 'In progress',
+  resolved: 'Resolved',
+}
 
 export default function ComplaintDetailPage() {
   const params = useParams()
@@ -205,258 +213,216 @@ export default function ComplaintDetailPage() {
     )
   }
 
+  const transcripts = [
+    { key: 'en', label: 'English', text: complaint.transcript_english, rtl: false },
+    { key: 'ur', label: 'Urdu', text: complaint.transcript_urdu, rtl: true },
+    { key: 'regional', label: 'As spoken', text: complaint.transcript_regional, rtl: true },
+  ].filter((t) => t.text)
+
+  const facts = [
+    { label: 'Department', value: complaint.department?.name || 'Unassigned' },
+    { label: 'Area', value: complaint.area || '—' },
+    { label: 'Category', value: complaint.category?.replace(/_/g, ' ') || '—' },
+    { label: 'Language', value: complaint.language?.toUpperCase() || '—' },
+    {
+      label: 'AI confidence',
+      value: complaint.confidence_score != null ? `${Math.round(complaint.confidence_score * 100)}%` : '—',
+    },
+    {
+      label: 'Sent to department',
+      value: complaint.dispatched_at ? format(new Date(complaint.dispatched_at), 'MMM d, h:mm a') : 'Not yet',
+    },
+  ]
+  if (complaint.reminded_at || complaint.escalated_at) {
+    facts.push({
+      label: 'Follow-up',
+      value: complaint.escalated_at
+        ? `Escalated ${format(new Date(complaint.escalated_at), 'MMM d')}`
+        : `Reminded ${format(new Date(complaint.reminded_at!), 'MMM d, h:mm a')}`,
+    })
+  }
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon-sm" onClick={() => router.push('/admin/complaints')}>
-          <ArrowLeft size={16} />
-        </Button>
-        <PageHeader
-          title={complaint.tracking_id}
-          description={`Filed ${format(new Date(complaint.created_at), 'MMM d, yyyy h:mm a')}`}
+      <div>
+        <Link
+          href="/admin/complaints"
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
+          <ArrowLeft size={14} /> All complaints
+        </Link>
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
+          <h1 className="font-mono text-2xl font-semibold tracking-tight sm:text-3xl">{complaint.tracking_id}</h1>
           <StatusBadge status={complaint.status} />
           <PriorityBadge priority={complaint.priority} />
-        </PageHeader>
+        </div>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Filed {format(new Date(complaint.created_at), 'MMM d, yyyy · h:mm a')}
+        </p>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Left: details */}
         <div className="space-y-6 lg:col-span-2">
-          {/* AI summary */}
-          {(complaint.summary || complaint.summary_urdu || complaint.review_reason || complaint.spam_reason) && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Summary</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {complaint.status === 'spam' && (
-                  <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-                    Flagged as spam: {complaint.spam_reason || 'not a genuine complaint'}. Not sent to any
-                    department.
-                  </p>
-                )}
-                {complaint.review_reason && complaint.status === 'needs_review' && (
-                  <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                    Held for review: {complaint.review_reason}
-                  </p>
-                )}
-                {complaint.summary && <p className="text-base font-medium">{complaint.summary}</p>}
+          <Card>
+            <CardContent className="space-y-5">
+              {complaint.status === 'spam' && (
+                <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
+                  Flagged as spam: {complaint.spam_reason || 'not a genuine complaint'}. Not sent to any department.
+                </p>
+              )}
+              {complaint.review_reason && complaint.status === 'needs_review' && (
+                <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                  Held for review: {complaint.review_reason}
+                </p>
+              )}
+              <div className="space-y-2">
+                <p className="text-lg leading-snug font-medium">
+                  {complaint.summary || (complaint.status === 'processing' ? 'The AI is still listening to this call…' : 'No summary')}
+                </p>
                 {complaint.summary_urdu && (
-                  <p dir="rtl" className="text-base text-muted-foreground">
+                  <p dir="rtl" className="text-lg leading-loose text-muted-foreground">
                     {complaint.summary_urdu}
                   </p>
                 )}
-              </CardContent>
-            </Card>
-          )}
+              </div>
+              <dl className="grid grid-cols-2 gap-x-6 gap-y-4 border-t pt-5 text-sm sm:grid-cols-3">
+                {facts.map((f) => (
+                  <div key={f.label}>
+                    <dt className="text-xs text-muted-foreground">{f.label}</dt>
+                    <dd className="mt-0.5 font-medium capitalize">{f.value}</dd>
+                  </div>
+                ))}
+              </dl>
+              {complaint.audio_url && (
+                <div className="rounded-lg bg-muted/60 p-3">
+                  <p className="mb-2 text-xs font-medium text-muted-foreground">Call recording</p>
+                  <audio controls src={`/api/complaints/${complaint.id}/recording`} className="w-full" preload="none" />
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           <LinkedReports complaint={complaint} />
 
-          {/* Complaint info */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Details</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-                <div>
-                  <dt className="text-muted-foreground">Category</dt>
-                  <dd className="font-medium capitalize">{complaint.category?.replace(/_/g, ' ') || '—'}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">Area</dt>
-                  <dd className="font-medium">{complaint.area || '—'}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">Department</dt>
-                  <dd className="font-medium">{complaint.department?.name || 'Unassigned'}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">Confidence</dt>
-                  <dd className="font-medium">
-                    {complaint.confidence_score != null
-                      ? `${Math.round(complaint.confidence_score * 100)}%`
-                      : '—'}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">Language spoken</dt>
-                  <dd className="font-medium uppercase">{complaint.language || '—'}</dd>
-                </div>
-                {(complaint.reminded_at || complaint.escalated_at) && (
-                  <div>
-                    <dt className="text-muted-foreground">Follow-up</dt>
-                    <dd className="font-medium">
-                      {complaint.escalated_at
-                        ? `Escalated to supervisor ${format(new Date(complaint.escalated_at), 'MMM d')}`
-                        : `Department reminded ${format(new Date(complaint.reminded_at!), 'MMM d, h:mm a')}`}
-                    </dd>
-                  </div>
-                )}
-                <div>
-                  <dt className="text-muted-foreground">Sent to department</dt>
-                  <dd className="font-medium">
-                    {complaint.dispatched_at
-                      ? format(new Date(complaint.dispatched_at), 'MMM d, h:mm a')
-                      : 'Not yet'}
-                  </dd>
-                </div>
-              </dl>
-            </CardContent>
-          </Card>
-
-          {/* Audio */}
-          {complaint.audio_url && (
+          {transcripts.length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle>Audio Recording</CardTitle>
+                <CardTitle>What the caller said</CardTitle>
               </CardHeader>
               <CardContent>
-                <audio controls src={`/api/complaints/${complaint.id}/recording`} className="w-full" preload="none" />
+                <Tabs defaultValue={transcripts[0].key}>
+                  <TabsList>
+                    {transcripts.map((t) => (
+                      <TabsTrigger key={t.key} value={t.key}>
+                        {t.label}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                  {transcripts.map((t) => (
+                    <TabsContent key={t.key} value={t.key}>
+                      <p
+                        dir={t.rtl ? 'rtl' : undefined}
+                        className={t.rtl ? 'mt-3 rounded-lg bg-muted/50 p-4 text-base leading-loose' : 'mt-3 rounded-lg bg-muted/50 p-4 text-sm leading-relaxed'}
+                      >
+                        {t.text}
+                      </p>
+                    </TabsContent>
+                  ))}
+                </Tabs>
               </CardContent>
             </Card>
           )}
 
-          {/* Transcripts */}
-          {(complaint.transcript_regional || complaint.transcript_urdu || complaint.transcript_english) && (
+          <div className="grid gap-6 xl:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle>Transcripts</CardTitle>
+                <CardTitle>History</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {complaint.transcript_regional && (
-                    <div>
-                      <p className="mb-1 text-xs font-medium text-muted-foreground">Regional</p>
-                      <p className="text-sm leading-relaxed rounded-lg bg-muted/50 p-3">
-                        {complaint.transcript_regional}
-                      </p>
-                    </div>
-                  )}
-                  {complaint.transcript_urdu && (
-                    <div>
-                      <p className="mb-1 text-xs font-medium text-muted-foreground">Urdu</p>
-                      <p className="text-sm leading-relaxed rounded-lg bg-muted/50 p-3" dir="rtl">
-                        {complaint.transcript_urdu}
-                      </p>
-                    </div>
-                  )}
-                  {complaint.transcript_english && (
-                    <div>
-                      <p className="mb-1 text-xs font-medium text-muted-foreground">English</p>
-                      <p className="text-sm leading-relaxed rounded-lg bg-muted/50 p-3">
-                        {complaint.transcript_english}
-                      </p>
-                    </div>
-                  )}
-                </div>
+                <StatusTimeline entries={statusHistory} />
               </CardContent>
             </Card>
-          )}
 
-          {/* Status Timeline */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Status History</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <StatusTimeline entries={statusHistory} />
-            </CardContent>
-          </Card>
-
-          {/* SMS to and from the citizen and department */}
-          <Card>
-            <CardHeader>
-              <CardTitle>SMS</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <SmsLog complaintId={complaint.id} />
-            </CardContent>
-          </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>SMS</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <SmsLog complaintId={complaint.id} />
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
         {/* Right: actions */}
         <div className="space-y-6">
           <CallerCard complaintId={complaint.id} status={complaint.status} onChanged={refreshComplaint} />
 
-          {/* Re-route */}
           <Card>
             <CardHeader>
-              <CardTitle>Re-route Complaint</CardTitle>
+              <CardTitle>Actions</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Department</label>
-                  <Select value={selectedDeptId} onValueChange={(v: string | null) => setSelectedDeptId(v ?? '')}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select department" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {departments.map((d) => (
-                        <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+            <CardContent className="space-y-5">
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-muted-foreground">Send to department</label>
+                <Select
+                  items={departments.map((d) => ({ value: d.id, label: d.name }))}
+                  value={selectedDeptId}
+                  onValueChange={(v: string | null) => setSelectedDeptId(v ?? '')}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {departments.map((d) => (
+                      <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <Button
-                  size="sm"
+                  variant="outline"
                   className="w-full"
                   disabled={rerouting || !selectedDeptId || selectedDeptId === complaint.department_id}
                   onClick={handleReroute}
                 >
                   <Save size={14} />
-                  {rerouting ? 'Saving...' : 'Save Department'}
+                  {rerouting ? 'Saving…' : 'Re-route'}
                 </Button>
-                {rerouteMsg && (
-                  <p className="text-xs text-muted-foreground">{rerouteMsg}</p>
-                )}
+                {rerouteMsg && <p className="text-xs text-muted-foreground">{rerouteMsg}</p>}
               </div>
-            </CardContent>
-          </Card>
 
-          {/* Status update */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Update Status</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">New Status</label>
-                  <Select value={newStatus} onValueChange={(v: string | null) => setNewStatus(v ?? '')}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {STATUSES.map((s) => (
-                        <SelectItem key={s} value={s}>
-                          {s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Remark</label>
-                  <Input
-                    placeholder="Optional remark..."
-                    value={remark}
-                    onChange={(e) => setRemark(e.target.value)}
-                  />
-                </div>
+              <div className="space-y-2 border-t pt-5">
+                <label className="text-xs font-medium text-muted-foreground">Change status</label>
+                <Select
+                  items={STATUSES.map((st) => ({ value: st, label: STATUS_LABELS[st] }))}
+                  value={newStatus}
+                  onValueChange={(v: string | null) => setNewStatus(v ?? '')}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATUSES.map((st) => (
+                      <SelectItem key={st} value={st}>
+                        {STATUS_LABELS[st]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  placeholder="Remark (optional)"
+                  value={remark}
+                  onChange={(e) => setRemark(e.target.value)}
+                />
                 <Button
-                  size="sm"
                   className="w-full"
                   disabled={updating || !newStatus || newStatus === complaint.status}
                   onClick={handleStatusUpdate}
                 >
-                  {updating ? 'Updating...' : 'Update Status'}
+                  {updating ? 'Updating…' : 'Update status'}
                 </Button>
-                {statusMsg && (
-                  <p className="text-xs text-muted-foreground">{statusMsg}</p>
-                )}
+                {statusMsg && <p className="text-xs text-muted-foreground">{statusMsg}</p>}
               </div>
             </CardContent>
           </Card>

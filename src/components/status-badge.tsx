@@ -11,7 +11,7 @@ const statusConfig: Record<string, { label: string; className: string }> = {
   },
   open: {
     label: 'Open',
-    className: 'bg-blue-100 text-blue-800 border-blue-200',
+    className: 'bg-sky-100 text-sky-800 border-sky-200',
   },
   in_progress: {
     label: 'In Progress',
@@ -34,7 +34,8 @@ export function StatusBadge({ status }: { status: string }) {
   }
 
   return (
-    <Badge variant="outline" className={config.className}>
+    <Badge variant="outline" className={`gap-1.5 rounded-full border-transparent px-2 font-medium ${config.className}`}>
+      <span className="size-1.5 rounded-full bg-current opacity-70" />
       {config.label}
     </Badge>
   )

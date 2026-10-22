@@ -83,7 +83,7 @@ export default function ComplaintsPage() {
       <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">Status</label>
-          <Select value={status} onValueChange={handleStatusChange}>
+          <Select items={STATUS_OPTIONS} value={status} onValueChange={handleStatusChange}>
             <SelectTrigger className="w-40">
               <SelectValue placeholder="All Statuses" />
             </SelectTrigger>
@@ -99,7 +99,7 @@ export default function ComplaintsPage() {
 
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">Priority</label>
-          <Select value={priority} onValueChange={handlePriorityChange}>
+          <Select items={PRIORITY_OPTIONS} value={priority} onValueChange={handlePriorityChange}>
             <SelectTrigger className="w-40">
               <SelectValue placeholder="All Priorities" />
             </SelectTrigger>

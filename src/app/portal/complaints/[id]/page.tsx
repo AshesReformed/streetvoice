@@ -251,7 +251,7 @@ export default function ComplaintDetailPage({
             <form onSubmit={handleStatusUpdate} className="space-y-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-muted-foreground">New Status</label>
-                <Select value={newStatus} onValueChange={(val) => setNewStatus(val ?? '')}>
+                <Select items={STATUS_OPTIONS} value={newStatus} onValueChange={(val) => setNewStatus(val ?? '')}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>

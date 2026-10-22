@@ -3,24 +3,14 @@
 import { useState } from 'react'
 import { useApi } from '@/lib/hooks/use-api'
 import Link from 'next/link'
-import { PhoneCall } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Clock, Inbox, PhoneCall } from 'lucide-react'
 import { PageHeader } from '@/components/page-header'
-import { DashboardCards } from '@/components/dashboard-cards'
 import {
   Card,
   CardHeader,
   CardTitle,
   CardContent,
 } from '@/components/ui/card'
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from '@/components/ui/table'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -65,6 +55,7 @@ export default function AdminDashboard() {
   } = useApi<DashboardSummary>('/api/dashboard/summary', { refreshMs: 10_000 })
 
   // Test call simulation (admin-only)
+  const [showSimulator, setShowSimulator] = useState(false)
   const [simulating, setSimulating] = useState(false)
   const [simulated, setSimulated] = useState<SimulatedCallResult | null>(null)
   const [simulateError, setSimulateError] = useState<string | null>(null)
@@ -101,10 +92,10 @@ export default function AdminDashboard() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Dashboard" description="Overview of all complaints" />
+        <PageHeader title="Dashboard" description="Live overview of every complaint" />
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-20 rounded-xl bg-muted animate-pulse" />
+            <div key={i} className="h-28 animate-pulse rounded-xl bg-muted" />
           ))}
         </div>
       </div>
@@ -114,7 +105,7 @@ export default function AdminDashboard() {
   if (error) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Dashboard" description="Overview of all complaints" />
+        <PageHeader title="Dashboard" description="Live overview of every complaint" />
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
           {error}
         </div>
@@ -124,159 +115,202 @@ export default function AdminDashboard() {
 
   if (!summary) return null
 
-  const statItems = [
-    { label: 'Total Complaints', value: summary.total_complaints },
-    { label: 'Processing', value: summary.by_status.processing ?? 0 },
-    { label: 'Needs Review', value: summary.by_status.needs_review ?? 0 },
-    { label: 'Open', value: summary.by_status.open ?? 0 },
-    { label: 'In Progress', value: summary.by_status.in_progress ?? 0 },
-    { label: 'Resolved', value: summary.by_status.resolved ?? 0 },
-    { label: 'Flagged as Spam', value: summary.by_status.spam ?? 0 },
+  const s = summary.by_status
+  const active = (s.open ?? 0) + (s.in_progress ?? 0)
+  const attention = (s.needs_review ?? 0) + (s.processing ?? 0)
+  const kpis = [
+    { label: 'Total complaints', value: summary.total_complaints, detail: `${s.spam ?? 0} flagged as spam`, icon: Inbox, href: '/admin/complaints' },
+    { label: 'With departments', value: active, detail: `${s.open ?? 0} open · ${s.in_progress ?? 0} in progress`, icon: Clock, href: '/admin/complaints' },
+    { label: 'Need a person', value: attention, detail: `${s.needs_review ?? 0} to review · ${s.processing ?? 0} with the AI`, icon: AlertTriangle, href: '/admin/needs-review', warn: (s.needs_review ?? 0) > 0 },
     {
-      label: 'Avg Resolution',
-      value: summary.avg_resolution_hours != null ? `${summary.avg_resolution_hours}h` : '—',
-      description: 'Average time to resolve',
+      label: 'Resolved',
+      value: s.resolved ?? 0,
+      detail: summary.avg_resolution_hours != null ? `in ${summary.avg_resolution_hours} h on average` : 'none yet',
+      icon: CheckCircle2,
+      href: '/admin/complaints',
     },
   ]
+  const statusTotal = STATUS_BAR.reduce((n, st) => n + (s[st.key] ?? 0), 0)
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Dashboard" description="Overview of all complaints across departments">
-        <>
-          <Input
-            className="h-7 w-72"
-            placeholder="Custom audio URL (optional)"
-            aria-label="Custom audio URL for simulated test call"
-            value={customAudioUrl}
-            onChange={(e) => setCustomAudioUrl(e.target.value)}
-            disabled={simulating}
-          />
-          <Select
-            value={simulateLanguage}
-            onValueChange={(v: string | null) =>
-              setSimulateLanguage(
-                SIMULATE_LANGUAGES.find((l) => l.code === v)?.code ?? 'unspecified'
-              )
-            }
-          >
-            <SelectTrigger
-              size="sm"
-              className="w-44"
-              aria-label="Language hint for simulated test call"
-              disabled={simulating}
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {SIMULATE_LANGUAGES.map((l) => (
-                <SelectItem key={l.code} value={l.code}>
-                  {l.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button variant="outline" size="sm" onClick={handleSimulateCall} disabled={simulating}>
-            <PhoneCall size={14} />
-            {simulating ? 'Simulating...' : 'Simulate a test call'}
-          </Button>
-        </>
+      <PageHeader title="Dashboard" description="Live overview of every complaint · updates every 10 seconds">
+        <Button variant="outline" size="sm" onClick={() => setShowSimulator((v) => !v)}>
+          <PhoneCall size={14} />
+          Test call
+        </Button>
       </PageHeader>
 
-      {simulated && (
-        <p className="text-sm text-muted-foreground">
-          Test call registered as{' '}
-          {simulated.complaint_id ? (
-            <Link
-              href={`/admin/complaints/${simulated.complaint_id}`}
-              className="font-medium text-primary underline-offset-4 hover:underline"
-            >
-              {simulated.tracking_id}
-            </Link>
-          ) : (
-            <span className="font-medium">{simulated.tracking_id}</span>
-          )}{' '}
-          — {simulated.category?.replace(/_/g, ' ') ?? 'unclassified'},{' '}
-          {simulated.department_name
-            ? `routed to ${simulated.department_name}`
-            : 'flagged for manual review'}
-          {simulated.status ? ` (${simulated.status.replace(/_/g, ' ')})` : ''}.
-        </p>
+      {showSimulator && (
+        <Card>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Send a sample recording through the full pipeline. Leave the URL empty for a random sample call.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Input
+                className="min-w-0 flex-1 sm:max-w-sm"
+                placeholder="Custom audio URL (optional)"
+                aria-label="Custom audio URL for simulated test call"
+                value={customAudioUrl}
+                onChange={(e) => setCustomAudioUrl(e.target.value)}
+                disabled={simulating}
+              />
+              <Select
+                items={SIMULATE_LANGUAGES.map((l) => ({ value: l.code, label: l.label }))}
+                value={simulateLanguage}
+                onValueChange={(v: string | null) =>
+                  setSimulateLanguage(
+                    SIMULATE_LANGUAGES.find((l) => l.code === v)?.code ?? 'unspecified'
+                  )
+                }
+              >
+                <SelectTrigger className="w-48" aria-label="Language hint for simulated test call" disabled={simulating}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SIMULATE_LANGUAGES.map((l) => (
+                    <SelectItem key={l.code} value={l.code}>
+                      {l.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button onClick={handleSimulateCall} disabled={simulating}>
+                <PhoneCall size={14} />
+                {simulating ? 'Calling…' : 'Send test call'}
+              </Button>
+            </div>
+            {simulated && (
+              <p className="text-sm text-muted-foreground">
+                Registered as{' '}
+                {simulated.complaint_id ? (
+                  <Link
+                    href={`/admin/complaints/${simulated.complaint_id}`}
+                    className="font-medium text-primary underline-offset-4 hover:underline"
+                  >
+                    {simulated.tracking_id}
+                  </Link>
+                ) : (
+                  <span className="font-medium">{simulated.tracking_id}</span>
+                )}{' '}
+                — {simulated.category?.replace(/_/g, ' ') ?? 'unclassified'},{' '}
+                {simulated.department_name
+                  ? `routed to ${simulated.department_name}`
+                  : 'flagged for manual review'}
+                {simulated.status ? ` (${simulated.status.replace(/_/g, ' ')})` : ''}.
+              </p>
+            )}
+            {simulateError && <p className="text-sm text-destructive">{simulateError}</p>}
+          </CardContent>
+        </Card>
       )}
-      {simulateError && <p className="text-sm text-destructive">{simulateError}</p>}
+
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        {kpis.map((k) => (
+          <Link key={k.label} href={k.href} className="group">
+            <Card className="h-full transition-shadow group-hover:shadow-md">
+              <CardContent className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm text-muted-foreground">{k.label}</p>
+                  <p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums sm:text-3xl">{k.value}</p>
+                  <p className="mt-1 text-xs text-muted-foreground sm:truncate">{k.detail}</p>
+                </div>
+                <span
+                  className={
+                    k.warn
+                      ? 'hidden size-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 sm:flex'
+                      : 'hidden size-10 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-foreground sm:flex'
+                  }
+                >
+                  <k.icon size={18} />
+                </span>
+              </CardContent>
+            </Card>
+          </Link>
+        ))}
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Where complaints stand</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex h-3 overflow-hidden rounded-full bg-muted">
+            {statusTotal > 0 &&
+              STATUS_BAR.map((st) =>
+                s[st.key] ? (
+                  <div
+                    key={st.key}
+                    className={st.color}
+                    style={{ width: `${((s[st.key] ?? 0) / statusTotal) * 100}%` }}
+                    title={`${st.label}: ${s[st.key]}`}
+                  />
+                ) : null
+              )}
+          </div>
+          <div className="flex flex-wrap gap-x-6 gap-y-2">
+            {STATUS_BAR.map((st) => (
+              <Link
+                key={st.key}
+                href={`/admin/complaints?status=${st.key}`}
+                className="flex items-center gap-2 text-sm hover:underline"
+              >
+                <span className={`size-2.5 rounded-full ${st.color}`} />
+                <span className="text-muted-foreground">{st.label}</span>
+                <span className="font-semibold tabular-nums">{s[st.key] ?? 0}</span>
+              </Link>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       <SystemHealthCard />
 
-      <DashboardCards items={statItems} />
-
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* By Department */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Complaints by Department</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {summary.by_department.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No department data yet.</p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Department</TableHead>
-                    <TableHead className="text-right">Count</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {[...summary.by_department]
-                    .sort((a, b) => b.count - a.count)
-                    .map((dept) => (
-                      <TableRow key={dept.department_id}>
-                        <TableCell className="font-medium">{dept.department_name}</TableCell>
-                        <TableCell className="text-right">
-                          <Badge variant="secondary">{dept.count}</Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* By Category */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Complaints by Category</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {summary.by_category.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No category data yet.</p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Category</TableHead>
-                    <TableHead className="text-right">Count</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {[...summary.by_category]
-                    .sort((a, b) => b.count - a.count)
-                    .map((cat) => (
-                      <TableRow key={cat.category}>
-                        <TableCell className="font-medium capitalize">
-                          {cat.category.replace(/_/g, ' ')}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Badge variant="secondary">{cat.count}</Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+        <BarList title="By department" rows={summary.by_department.map((d) => ({ label: d.department_name, count: d.count }))} empty="No department data yet." />
+        <BarList title="By category" rows={summary.by_category.map((c) => ({ label: c.category.replace(/_/g, ' '), count: c.count }))} empty="No category data yet." />
       </div>
     </div>
+  )
+}
+
+const STATUS_BAR = [
+  { key: 'processing', label: 'With the AI', color: 'bg-slate-400' },
+  { key: 'needs_review', label: 'Needs review', color: 'bg-amber-400' },
+  { key: 'open', label: 'Open', color: 'bg-sky-500' },
+  { key: 'in_progress', label: 'In progress', color: 'bg-orange-400' },
+  { key: 'resolved', label: 'Resolved', color: 'bg-emerald-500' },
+  { key: 'spam', label: 'Spam', color: 'bg-red-400' },
+]
+
+function BarList({ title, rows, empty }: { title: string; rows: { label: string; count: number }[]; empty: string }) {
+  const sorted = [...rows].sort((a, b) => b.count - a.count)
+  const max = sorted[0]?.count || 1
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {sorted.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{empty}</p>
+        ) : (
+          <ul className="space-y-3">
+            {sorted.map((r) => (
+              <li key={r.label}>
+                <div className="flex items-baseline justify-between gap-3 text-sm">
+                  <span className="truncate capitalize">{r.label}</span>
+                  <span className="font-medium tabular-nums">{r.count}</span>
+                </div>
+                <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-muted">
+                  <div className="h-full rounded-full bg-primary/80" style={{ width: `${(r.count / max) * 100}%` }} />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
   )
 }

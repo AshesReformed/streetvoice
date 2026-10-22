@@ -47,12 +47,12 @@ export default async function DepartmentComplaintPage({
   })
 
   return (
-    <div className="flex flex-1 justify-center bg-zinc-50 px-4 py-8 dark:bg-zinc-950">
+    <div className="flex flex-1 justify-center bg-background px-4 py-8">
       <div className="w-full max-w-md space-y-4">
-        <div className="text-center">
-          <p className="text-sm text-muted-foreground">StreetVoice</p>
-          <h1 className="font-mono text-3xl font-bold tracking-widest">{complaint.tracking_id}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+        <div className="rounded-2xl bg-sidebar px-6 py-5 text-center text-white shadow-lg">
+          <p className="text-sm text-white/60">StreetVoice</p>
+          <h1 className="mt-1 font-mono text-3xl font-semibold tracking-widest">{complaint.tracking_id}</h1>
+          <p className="mt-2 text-sm text-sidebar-primary">
             <span dir="rtl">{department?.name_ur ?? department?.name ?? '—'}</span>
             <span> · </span>
             <span dir="ltr">{filedAt}</span>

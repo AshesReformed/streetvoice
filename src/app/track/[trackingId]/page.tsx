@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { toAsciiDigits } from "@/lib/sms/phone";
+import { Mic } from "lucide-react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 
 // Public complaint tracker, in Urdu and English. Shows only the status, the
@@ -23,6 +24,17 @@ const STEP_INDEX: Record<string, number> = {
   in_progress: 2,
   resolved: 3,
 };
+
+function Brand() {
+  return (
+    <Link href="/" className="flex items-center justify-center gap-2 text-sm font-semibold">
+      <span className="flex size-7 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+        <Mic size={14} strokeWidth={2.5} />
+      </span>
+      StreetVoice
+    </Link>
+  );
+}
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleString("en-PK", {
@@ -49,19 +61,20 @@ export default async function TrackPage({
 
   if (!complaint) {
     return (
-      <div className="flex flex-1 items-center justify-center bg-zinc-50 px-4 dark:bg-zinc-950">
+      <div className="flex flex-1 flex-col items-center justify-center gap-6 bg-background px-4">
+        <Brand />
         <Card className="w-full max-w-sm">
           <CardHeader>
             <CardTitle dir="rtl" className="text-right">شکایت نہیں ملی</CardTitle>
             <p className="text-sm text-muted-foreground">
               No complaint found with number{" "}
-              <code className="rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-xs dark:bg-zinc-800">
+              <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
                 {trackingId}
               </code>
             </p>
           </CardHeader>
           <CardFooter>
-            <Link href="/" className="text-sm underline">
+            <Link href="/#track" className="text-sm font-medium text-primary hover:underline">
               Check another number
             </Link>
           </CardFooter>
@@ -87,29 +100,45 @@ export default async function TrackPage({
   const underReview = complaint.status === "needs_review" || complaint.status === "spam";
 
   return (
-    <div className="flex flex-1 items-center justify-center bg-zinc-50 px-4 py-8 dark:bg-zinc-950">
+    <div className="flex flex-1 items-center justify-center bg-background px-4 py-10">
       <div className="w-full max-w-sm space-y-6">
-        <div className="text-center">
-          <p className="text-sm text-muted-foreground">StreetVoice · شکایت نمبر</p>
-          <h1 className="font-mono text-4xl font-bold tracking-[0.2em]">{complaint.tracking_id}</h1>
+        <Brand />
+        <div className="rounded-2xl bg-sidebar px-6 py-6 text-center text-white shadow-lg">
+          <p className="text-sm text-white/60">
+            Complaint number · <span dir="rtl">شکایت نمبر</span>
+          </p>
+          <h1 className="mt-1 font-mono text-4xl font-semibold tracking-[0.2em]">{complaint.tracking_id}</h1>
           {dept && (
-            <p className="mt-1 text-sm text-muted-foreground">
-              <span dir="rtl">{dept.name_ur ?? dept.name}</span> · {dept.name}
+            <p className="mt-2 text-sm text-sidebar-primary">
+              {dept.name}
+              {dept.name_ur && dept.name_ur !== dept.name && (
+                <>
+                  {" "}
+                  · <span dir="rtl">{dept.name_ur}</span>
+                </>
+              )}
             </p>
           )}
         </div>
 
         <Card>
           <CardContent>
-            <ol className="space-y-5">
+            <ol>
               {STEPS.map((step, i) => {
                 const done = i <= current;
                 const time = reachedAt[step.status];
+                const last = i === STEPS.length - 1;
                 return (
-                  <li key={step.status} className="flex items-start gap-3">
+                  <li key={step.status} className="relative flex gap-3 pb-6 last:pb-0">
+                    {!last && (
+                      <span
+                        className={`absolute top-6 bottom-0 left-[11px] w-0.5 ${i < current ? "bg-primary" : "bg-border"}`}
+                        aria-hidden
+                      />
+                    )}
                     <span
-                      className={`mt-1 flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
-                        done ? "bg-emerald-600 text-white" : "border-2 border-zinc-300 text-transparent"
+                      className={`relative mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                        done ? "bg-primary text-primary-foreground" : "border-2 border-border bg-card text-transparent"
                       }`}
                       aria-hidden
                     >
@@ -124,7 +153,7 @@ export default async function TrackPage({
                       </div>
                       {done && time && <p className="text-xs text-muted-foreground">{formatTime(time)}</p>}
                       {i === 0 && underReview && (
-                        <p className="text-xs text-amber-700">
+                        <p className="mt-1 text-xs text-amber-700">
                           Being checked by our team · <span dir="rtl">ہماری ٹیم جانچ رہی ہے</span>
                         </p>
                       )}
@@ -135,7 +164,7 @@ export default async function TrackPage({
             </ol>
           </CardContent>
           <CardFooter className="flex justify-between text-sm">
-            <Link href="/" className="underline">
+            <Link href="/#track" className="font-medium text-primary hover:underline">
               Check another
             </Link>
             <span className="text-muted-foreground">Updates also come by SMS</span>

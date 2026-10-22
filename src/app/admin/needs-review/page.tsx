@@ -149,6 +149,7 @@ export default function NeedsReviewPage() {
                     <TableCell>
                       <div className="flex items-center gap-1.5">
                         <Select
+                          items={departments.map((d) => ({ value: d.id, label: d.name }))}
                           value={assignMap[complaint.id] || ''}
                           onValueChange={(v: string | null) =>
                             setAssignMap((prev) => ({ ...prev, [complaint.id]: v ?? '' }))
