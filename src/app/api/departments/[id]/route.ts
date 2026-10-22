@@ -25,6 +25,7 @@ export async function PATCH(
     if (data.name_ur !== undefined) updatePayload.name_ur = data.name_ur;
     if (data.description !== undefined) updatePayload.description = data.description;
     if (data.sms_number !== undefined) updatePayload.sms_number = data.sms_number;
+    if (data.supervisor_sms_number !== undefined) updatePayload.supervisor_sms_number = data.supervisor_sms_number;
 
     const { data: department, error } = await supabase
       .from('departments')

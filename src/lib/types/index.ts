@@ -6,6 +6,7 @@ export interface Department {
   description: string | null;
   name_ur: string | null;
   sms_number: string | null;
+  supervisor_sms_number: string | null;
   created_at: string;
 }
 
@@ -44,6 +45,10 @@ export interface Complaint {
   confidence_score: number | null;
   status: 'processing' | 'needs_review' | 'open' | 'in_progress' | 'resolved' | 'spam';
   spam_reason: string | null;
+  duplicate_of: string | null;
+  report_count: number;
+  reminded_at: string | null;
+  escalated_at: string | null;
   priority: 'low' | 'medium' | 'high';
   area: string | null;
   assigned_officer_id: string | null;

@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { AlertBanner } from '@/components/alert-banner'
 
 const NAV_LINKS = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
@@ -108,6 +109,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Main content */}
       <main className="flex flex-1 flex-col overflow-hidden">
+        <AlertBanner />
         <div className="flex-1 overflow-y-auto p-6">{children}</div>
       </main>
     </div>

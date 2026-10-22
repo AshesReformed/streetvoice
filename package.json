@@ -12,7 +12,8 @@
     "seed:demo": "tsx scripts/seed-demo-data.ts",
     "make:prompts": "tsx scripts/make-prompts.ts",
     "make:samples": "tsx scripts/make-samples.ts",
-    "try:analyzer": "tsx scripts/try-analyzer.ts"
+    "try:analyzer": "tsx scripts/try-analyzer.ts",
+    "load-test": "tsx scripts/load-test.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

@@ -10,6 +10,7 @@ import { PriorityBadge } from '@/components/priority-badge'
 import { StatusTimeline } from '@/components/status-timeline'
 import { SmsLog } from '@/components/sms-log'
 import { CallerCard } from '@/components/caller-card'
+import { LinkedReports } from '@/components/linked-reports'
 import {
   Card,
   CardHeader,
@@ -250,6 +251,8 @@ export default function ComplaintDetailPage() {
             </Card>
           )}
 
+          <LinkedReports complaint={complaint} />
+
           {/* Complaint info */}
           <Card>
             <CardHeader>
@@ -281,6 +284,16 @@ export default function ComplaintDetailPage() {
                   <dt className="text-muted-foreground">Language spoken</dt>
                   <dd className="font-medium uppercase">{complaint.language || '—'}</dd>
                 </div>
+                {(complaint.reminded_at || complaint.escalated_at) && (
+                  <div>
+                    <dt className="text-muted-foreground">Follow-up</dt>
+                    <dd className="font-medium">
+                      {complaint.escalated_at
+                        ? `Escalated to supervisor ${format(new Date(complaint.escalated_at), 'MMM d')}`
+                        : `Department reminded ${format(new Date(complaint.reminded_at!), 'MMM d, h:mm a')}`}
+                    </dd>
+                  </div>
+                )}
                 <div>
                   <dt className="text-muted-foreground">Sent to department</dt>
                   <dd className="font-medium">

@@ -14,6 +14,8 @@ export async function GET(request: NextRequest) {
     const priority = searchParams.get('priority');
     const area = searchParams.get('area');
     const departmentId = searchParams.get('department_id');
+    // Escalated and still not resolved
+    const overdue = searchParams.get('overdue') === '1';
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20', 10)));
     const offset = (page - 1) * limit;
@@ -29,6 +31,7 @@ export async function GET(request: NextRequest) {
     if (priority) query = query.eq('priority', priority);
     if (area) query = query.eq('area', area);
     if (departmentId) query = query.eq('department_id', departmentId);
+    if (overdue) query = query.not('escalated_at', 'is', null).in('status', ['open', 'in_progress']);
 
     const { data: complaints, error, count } = await query;
 

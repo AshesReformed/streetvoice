@@ -31,6 +31,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import type { DashboardSummary } from '@/lib/types'
+import { SystemHealthCard } from '@/components/system-health'
 
 interface SimulatedCallResult {
   tracking_id: string
@@ -202,6 +203,8 @@ export default function AdminDashboard() {
         </p>
       )}
       {simulateError && <p className="text-sm text-destructive">{simulateError}</p>}
+
+      <SystemHealthCard />
 
       <DashboardCards items={statItems} />
 

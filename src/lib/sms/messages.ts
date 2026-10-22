@@ -42,6 +42,28 @@ export const sms = {
       .filter(Boolean)
       .join('\n'),
 
+  // Same problem as a complaint the department already has
+  citizenLinked: (id: string, parentId: string) =>
+    `StreetVoice: آپ کی شکایت ${id} اسی مسئلے کی شکایت ${parentId} کے ساتھ جوڑ دی گئی ہے، جو محکمے کو بھیجی جا چکی ہے۔ آپ کو اطلاع ملتی رہے گی۔`,
+
+  departmentMoreReports: (id: string, count: number) =>
+    `StreetVoice: شکایت ${id} کے بارے میں اب تک ${count} شہری شکایت کر چکے ہیں۔`,
+
+  departmentReminder: (id: string, link: string) =>
+    [
+      `StreetVoice یاد دہانی: شکایت ${id} ابھی زیر التوا ہے۔`,
+      `تفصیل: ${link}`,
+      `کام شروع ہو تو لکھیں: ${id} OK`,
+    ].join('\n'),
+
+  supervisorEscalation: (id: string, department: string, days: number, link: string) =>
+    [
+      `StreetVoice: شکایت ${id} (${department}) ${days} دن سے حل نہیں ہوئی۔`,
+      `تفصیل: ${link}`,
+    ].join('\n'),
+
+  adminAlert: (message: string) => `StreetVoice alert: ${message}`,
+
   status: (id: string, status: ComplaintStatus) =>
     `StreetVoice: شکایت نمبر ${id} ${STATUS_UR[status] ?? status}۔`,
 

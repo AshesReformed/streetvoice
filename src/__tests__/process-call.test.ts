@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { ComplaintAnalysis } from '@/lib/services/types';
 import { FakeDb } from './helpers/fake-supabase';
 
@@ -10,6 +10,7 @@ vi.mock('@/lib/services', () => ({ getComplaintAnalyzer: vi.fn() }));
 vi.mock('@/lib/sms/notify', () => ({
   notifyCitizen: vi.fn(async () => true),
   announceRouted: vi.fn(async () => undefined),
+  sendSms: vi.fn(async () => true),
 }));
 vi.mock('@/lib/recordings', () => ({
   storeRecording: vi.fn(async (id: string) => `storage://recordings/${id}.wav`),
@@ -27,7 +28,7 @@ import {
 } from '@/lib/pipeline/process-call';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getComplaintAnalyzer } from '@/lib/services';
-import { announceRouted, notifyCitizen } from '@/lib/sms/notify';
+import { announceRouted, notifyCitizen, sendSms } from '@/lib/sms/notify';
 import { hashPhone } from '@/lib/sms/phone';
 
 const analyzeSpy = vi.fn();
@@ -71,6 +72,10 @@ beforeEach(() => {
   vi.mocked(createAdminClient).mockReturnValue(db as unknown as ReturnType<typeof createAdminClient>);
   analyzeSpy.mockResolvedValue(analysis());
   vi.mocked(getComplaintAnalyzer).mockReturnValue({ analyze: analyzeSpy });
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('fileComplaint', () => {
@@ -174,6 +179,30 @@ describe('analyzeComplaint', () => {
       status: 'needs_review',
       processing_attempts: MAX_ANALYSIS_ATTEMPTS,
     });
+  });
+
+  it('links a second report of the same issue instead of texting the department again', async () => {
+    // Within the 48-hour window of the fake database's timestamps
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.parse('2026-10-01T01:00:00Z') });
+    const first = await fileComplaint(call(8));
+    await analyzeComplaint(first.complaint_id);
+    vi.mocked(announceRouted).mockClear();
+    const second = await fileComplaint(call(9, { caller_id: '+923001112233' }));
+
+    expect(await analyzeComplaint(second.complaint_id)).toEqual({
+      result: 'duplicate',
+      department: 'Electricity',
+      duplicate_of: first.tracking_id,
+      reports: 2,
+    });
+    expect(complaintRow(second.complaint_id)).toMatchObject({
+      status: 'open',
+      duplicate_of: first.complaint_id,
+    });
+    expect(complaintRow(first.complaint_id).report_count).toBe(2);
+    expect(announceRouted).not.toHaveBeenCalled();
+    // Below the first milestone the department isn't texted about it
+    expect(vi.mocked(sendSms).mock.calls.map((c) => c[0].purpose)).not.toContain('department_more_reports');
   });
 
   it('skips complaints that are no longer processing', async () => {

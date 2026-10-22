@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getSmsProvider } from './provider';
 import { sms } from './messages';
+import { propagateStatus } from '@/lib/pipeline/duplicates';
 
 // ===========================================================================
 // Who gets an SMS, and when:
@@ -10,6 +11,7 @@ import { sms } from './messages';
 //                  citizen:    "sent to the Electricity department"
 //   in_progress  → citizen: "work has started"
 //   resolved     → citizen: "resolved"
+//   (linked duplicates follow the first complaint; see pipeline/duplicates)
 //
 // Every message is logged in sms_messages. Sending never throws: a failed
 // SMS is logged and must not break the complaint flow.
@@ -147,9 +149,16 @@ export async function announceRouted(complaintId: string): Promise<void> {
   await notifyCitizen(complaintId, 'routed');
 }
 
-/** Citizen SMS for a status change made in the control room or by SMS reply. */
+/**
+ * Citizen SMS for a status change made in the control room or by SMS reply.
+ * Complaints linked as the same issue follow along, and their callers are
+ * told too.
+ */
 export async function announceStatus(complaintId: string, status: string): Promise<void> {
   if (status === 'in_progress' || status === 'resolved') {
     await notifyCitizen(complaintId, status);
+    for (const childId of await propagateStatus(complaintId, status)) {
+      await notifyCitizen(childId, status);
+    }
   }
 }

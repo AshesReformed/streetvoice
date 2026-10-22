@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { useApi } from '@/lib/hooks/use-api'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { PageHeader } from '@/components/page-header'
 import { ComplaintsTable } from '@/components/complaints-table'
 import { Button } from '@/components/ui/button'
@@ -21,8 +21,18 @@ const STATUSES = ['', 'processing', 'needs_review', 'open', 'in_progress', 'reso
 const PRIORITIES = ['', 'low', 'medium', 'high']
 const PAGE_SIZE = 20
 
+// useSearchParams needs a Suspense boundary for the static build
 export default function AllComplaintsPage() {
+  return (
+    <Suspense>
+      <AllComplaints />
+    </Suspense>
+  )
+}
+
+function AllComplaints() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [page, setPage] = useState(1)
 
   // Filters
@@ -30,6 +40,8 @@ export default function AllComplaintsPage() {
   const [priority, setPriority] = useState('')
   const [departmentId, setDepartmentId] = useState('')
   const [areaSearch, setAreaSearch] = useState('')
+  // The health panel links here with ?overdue=1
+  const [overdue, setOverdue] = useState(searchParams.get('overdue') === '1')
 
   const { data: departmentsData } = useApi<Department[]>('/api/departments')
   const departments = departmentsData ?? []
@@ -42,6 +54,7 @@ export default function AllComplaintsPage() {
   if (priority) params.set('priority', priority)
   if (departmentId) params.set('department_id', departmentId)
   if (areaSearch) params.set('area', areaSearch)
+  if (overdue) params.set('overdue', '1')
 
   const { data, loading, error } = useApi<{ complaints: Complaint[]; total: number }>(
     `/api/complaints?${params}`,
@@ -55,11 +68,12 @@ export default function AllComplaintsPage() {
     setPriority('')
     setDepartmentId('')
     setAreaSearch('')
+    setOverdue(false)
     setPage(1)
   }
 
   const totalPages = Math.ceil(total / PAGE_SIZE)
-  const hasFilters = status || priority || departmentId || areaSearch
+  const hasFilters = status || priority || departmentId || areaSearch || overdue
 
   return (
     <div className="space-y-6">
@@ -129,6 +143,14 @@ export default function AllComplaintsPage() {
             />
           </div>
         </div>
+
+        <Button
+          variant={overdue ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => { setOverdue((v) => !v); setPage(1) }}
+        >
+          Overdue only
+        </Button>
 
         {hasFilters && (
           <Button variant="ghost" size="sm" onClick={handleResetFilters}>

@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { hashPhone } from '@/lib/sms/phone';
+import { checkFlood } from '@/lib/ops/alerts';
 
 // ===========================================================================
 // Spam and flood guard, checked before a call is filed:
@@ -9,7 +10,8 @@ import { hashPhone } from '@/lib/sms/phone';
 //   too many calls per IP     → refused (browser simulator only)
 //
 // Counts come from the call_attempts table, so they hold across serverless
-// instances. Limits can be tuned with env vars (see LIMITS).
+// instances. Limits can be tuned with env vars (see LIMITS). Every logged
+// attempt also runs the flood check (lib/ops/alerts.ts).
 // ===========================================================================
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -113,6 +115,8 @@ export async function recordAttempt(
     channel,
     ...(complaintId ? { complaint_id: complaintId } : {}),
   });
+  // An alarm must never stop a call from being filed
+  await checkFlood().catch((err) => console.error('Flood check failed:', err));
 }
 
 const BLOCKED_MESSAGE = {

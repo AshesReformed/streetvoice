@@ -45,6 +45,7 @@ export async function POST(request: NextRequest) {
         name_ur: data.name_ur ?? null,
         description: data.description ?? null,
         sms_number: data.sms_number ?? null,
+        supervisor_sms_number: data.supervisor_sms_number ?? null,
       })
       .select('*')
       .single();

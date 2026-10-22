@@ -32,17 +32,26 @@ interface DepartmentForm {
   name: string
   nameUr: string
   smsNumber: string
+  supervisorNumber: string
   description: string
   keywords: string
 }
 
-const EMPTY_FORM: DepartmentForm = { name: '', nameUr: '', smsNumber: '', description: '', keywords: '' }
+const EMPTY_FORM: DepartmentForm = {
+  name: '',
+  nameUr: '',
+  smsNumber: '',
+  supervisorNumber: '',
+  description: '',
+  keywords: '',
+}
 
 function toForm(dept: Department): DepartmentForm {
   return {
     name: dept.name,
     nameUr: dept.name_ur || '',
     smsNumber: dept.sms_number || '',
+    supervisorNumber: dept.supervisor_sms_number || '',
     description: dept.description || '',
     keywords: dept.keywords.join(', '),
   }
@@ -53,6 +62,7 @@ function toPayload(form: DepartmentForm) {
     name: form.name.trim(),
     name_ur: form.nameUr.trim() || null,
     sms_number: form.smsNumber.trim() || null,
+    supervisor_sms_number: form.supervisorNumber.trim() || null,
     description: form.description.trim() || null,
     keywords: form.keywords
       .split(',')
@@ -88,6 +98,14 @@ function DepartmentFields({
         <Input placeholder="e.g. 0300 1234567" value={form.smsNumber} onChange={set('smsNumber')} />
         <p className="text-xs text-muted-foreground">
           New complaints are sent here in Urdu. Replies from this number (&quot;482913 DONE&quot;) update the complaint.
+        </p>
+      </div>
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-muted-foreground">Supervisor SMS number (optional)</label>
+        <Input placeholder="e.g. 0321 7654321" value={form.supervisorNumber} onChange={set('supervisorNumber')} />
+        <p className="text-xs text-muted-foreground">
+          Told when a complaint is still not resolved after a week. Without one, the control room&apos;s alert
+          numbers are told.
         </p>
       </div>
       <div className="space-y-1">

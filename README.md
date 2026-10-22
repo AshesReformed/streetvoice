@@ -31,6 +31,9 @@ Citizen ◄── SMS when the complaint is registered, sent to the department,
 - **Departments need no new software and no login.** They get an Urdu SMS on a phone they already have, and reply by SMS. Only the department's own number can update its complaints.
 - **A control room** (web, for the team running the line) shows every complaint live. It catches the ones the AI wasn't sure about, and shows every SMS in and out.
 - **Spam and floods are stopped before they cost anything.** Each number can file a few complaints an hour, blocked numbers are refused before recording, and the AI labels pranks, abuse, silence and test calls as spam. Spam never reaches a department; repeat spammers are blocked automatically for 24 hours, and the control room can block or unblock any caller.
+- **Thirty calls about one transformer are one complaint.** A complaint about the same department and area as an open one is linked to it ("×30 reports"); its priority rises, and the department isn't texted thirty times. Every caller still gets a tracking number and the updates.
+- **Alarms.** A flood of calls, one number refused again and again, a spike of complaints from one area, a backlog waiting for the AI, or the SMS phone failing raise a red banner in the control room and an SMS to the team. A System health panel shows calls, queue, SMS and free-tier storage live.
+- **Nothing waits forever.** Departments get a reminder after 24 hours without an OK (4 hours when urgent); after 7 days the complaint is escalated to the department's supervisor and shows as Overdue.
 - **Anyone can track a complaint** by number on the bilingual tracking page, or by texting the number.
 
 ## What's in this repo
@@ -46,6 +49,9 @@ Citizen ◄── SMS when the complaint is registered, sent to the department,
 | Public tracker (Urdu/English) | `src/app/track/[trackingId]/` |
 | Control room | `src/app/admin/` |
 | Spam and flood guard: limits per number and IP, blocklist, AI spam label | `src/lib/abuse/guard.ts`, `src/app/admin/flagged/` |
+| Duplicate grouping | `src/lib/pipeline/duplicates.ts` |
+| Alarms, reminders and escalation, health panel | `src/lib/ops/`, `src/components/system-health.tsx` |
+| Load test: many simultaneous calls, then watches the AI queue drain | `scripts/load-test.ts` |
 | Database, security rules (Row-Level Security) | `supabase/migrations/` |
 | Offline fallback: self-hosted Whisper + NLLB + keyword routing | `src/lib/services/staged-analyzer.ts` |
 
@@ -83,6 +89,7 @@ Going online: [docs/DEPLOY.md](docs/DEPLOY.md). Real SMS: [docs/SMS-PHONE.md](do
 | --- | --- |
 | `npm test` | Unit tests (Vitest) |
 | `npm run try:analyzer -- <file or folder>` | Run the AI on recordings and print what it extracted |
+| `npm run load-test -- --calls 200` | Fire 200 simultaneous calls at a local server (start it with `AI_PROVIDER=staged ASR_PROVIDER=mock SMS_PROVIDER=mock`), report time to file and how the queue drains, then delete the test data |
 | `npm run make:samples` / `npm run make:prompts` | Regenerate sample calls / Urdu voice prompts with Gemini TTS |
 
 ## Demo script (3 minutes)

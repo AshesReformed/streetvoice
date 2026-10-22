@@ -1,5 +1,5 @@
 // A tiny in-memory stand-in for the Supabase query builder, covering the
-// calls the pipeline makes: select/insert/update with eq/lt filters,
+// calls the pipeline makes: select/insert/update with eq/neq/in/is/not/lt/gte filters,
 // order, limit, single/maybeSingle, and awaiting a builder directly.
 // It also mimics the complaints status-change trigger (status_history row).
 
@@ -29,6 +29,7 @@ export class FakeDb {
       if (table === 'complaints') {
         full.tracking_id ??= String(100000 + idCounter);
         full.processing_attempts ??= 0;
+        full.report_count ??= 1;
       }
       return full;
     });
@@ -62,6 +63,24 @@ class Query implements PromiseLike<{ data: unknown; error: null }> {
   }
   eq(col: string, value: unknown) {
     this.filters.push((row) => row[col] === value);
+    return this;
+  }
+  neq(col: string, value: unknown) {
+    this.filters.push((row) => row[col] !== value);
+    return this;
+  }
+  in(col: string, values: unknown[]) {
+    this.filters.push((row) => values.includes(row[col]));
+    return this;
+  }
+  /** Only `.is(col, null)`: a missing column counts as null */
+  is(col: string) {
+    this.filters.push((row) => row[col] == null);
+    return this;
+  }
+  /** Only `.not(col, 'is', null)` */
+  not(col: string) {
+    this.filters.push((row) => row[col] != null);
     return this;
   }
   gte(col: string, value: string) {

@@ -65,6 +65,14 @@ export function ComplaintsTable({
           >
             <TableCell className="font-mono text-xs">
               {complaint.tracking_id}
+              {complaint.report_count > 1 && (
+                <span className="ml-1.5 rounded bg-orange-100 px-1 py-0.5 font-sans text-[10px] font-medium text-orange-800">
+                  ×{complaint.report_count} reports
+                </span>
+              )}
+              {complaint.duplicate_of && (
+                <span className="ml-1.5 font-sans text-[10px] text-muted-foreground">linked</span>
+              )}
             </TableCell>
             <TableCell>{complaint.category || '—'}</TableCell>
             <TableCell>

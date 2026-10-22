@@ -5,6 +5,7 @@ import { recordingUrl, storeRecording } from '@/lib/recordings';
 import { announceRouted, notifyCitizen } from '@/lib/sms/notify';
 import { hashPhone, normalizePhone } from '@/lib/sms/phone';
 import { autoBlockIfRepeatSpammer } from '@/lib/abuse/guard';
+import { findOpenDuplicate, linkDuplicate } from '@/lib/pipeline/duplicates';
 import { TelephonyWebhookInput, TelephonyWebhookOutput } from '@/lib/services/types';
 
 // ===========================================================================
@@ -17,7 +18,9 @@ import { TelephonyWebhookInput, TelephonyWebhookOutput } from '@/lib/services/ty
 //    the retry sweep. Copies the recording into private storage, asks the AI
 //    analyzer what the complaint is, and routes it ('open'), holds it for
 //    an admin ('needs_review') or flags it as spam ('spam', never sent to a
-//    department; repeat spammers are blocked automatically).
+//    department; repeat spammers are blocked automatically). A routed
+//    complaint about the same department and area as an open one is linked
+//    to it instead of being sent again (see duplicates.ts).
 //
 // The AI takes 10–40 s per call; a phone webhook gives about 15 s, which is
 // why analysis can't happen while the caller waits.
@@ -130,6 +133,7 @@ export async function fileComplaint(payload: TelephonyWebhookInput): Promise<Fil
 export type AnalysisOutcome =
   | { result: 'routed' | 'needs_review'; department: string | null }
   | { result: 'spam'; reason: string; caller_blocked: boolean }
+  | { result: 'duplicate'; department: string; duplicate_of: string; reports: number }
   | { result: 'retry' | 'gave_up'; error: string }
   | { result: 'skipped' };
 
@@ -249,7 +253,33 @@ export async function analyzeComplaint(complaintId: string): Promise<AnalysisOut
         : `Routed automatically to ${analysis.category}`
     );
 
-    // 5. Routed: SMS the department (Urdu, no-login link) and the citizen
+    // 5. Same problem as an open complaint? Link it instead of sending it again
+    if (departmentId) {
+      const parent = await findOpenDuplicate(complaintId, departmentId, analysis.area);
+      if (parent) {
+        const { data: child } = await supabase
+          .from('complaints')
+          .select('id, tracking_id, citizen:citizens(phone), department:departments(sms_number)')
+          .eq('id', complaintId)
+          .single();
+        const reports = await linkDuplicate(
+          {
+            id: complaintId,
+            tracking_id: child?.tracking_id ?? '',
+            citizenPhone: (child?.citizen as unknown as { phone: string | null } | null)?.phone ?? null,
+          },
+          parent,
+          (child?.department as unknown as { sms_number: string | null } | null) ?? null
+        );
+        await remarkLatestHistory(
+          complaintId,
+          `Same issue as ${parent.tracking_id} (${reports} reports); not sent to the department again`
+        );
+        return { result: 'duplicate', department: analysis.category, duplicate_of: parent.tracking_id, reports };
+      }
+    }
+
+    // 6. Routed: SMS the department (Urdu, no-login link) and the citizen
     // (the complaint is already saved, so an SMS problem must not fail it)
     if (!analysis.needs_review) {
       await announceRouted(complaintId).catch((err) =>

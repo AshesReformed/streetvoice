@@ -34,6 +34,7 @@ export const createDepartmentSchema = z.object({
   name_ur: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
   sms_number: optionalPhone,
+  supervisor_sms_number: optionalPhone,
   keywords: z.array(z.string()).default([]),
   contact_info: z.string().nullable().optional(),
 });
@@ -43,6 +44,7 @@ export const updateDepartmentSchema = z.object({
   name_ur: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
   sms_number: optionalPhone,
+  supervisor_sms_number: optionalPhone,
   keywords: z.array(z.string()).optional(),
   contact_info: z.string().nullable().optional(),
 });
