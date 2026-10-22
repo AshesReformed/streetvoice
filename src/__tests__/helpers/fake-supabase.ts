@@ -1,5 +1,5 @@
 // A tiny in-memory stand-in for the Supabase query builder, covering the
-// calls the pipeline makes: select/insert/update with eq/neq/in/is/not/lt/gte filters,
+// calls the pipeline makes: select/insert/upsert/update with eq/neq/in/is/not/lt/gte filters,
 // order, limit, single/maybeSingle, and awaiting a builder directly.
 // It also mimics the complaints status-change trigger (status_history row).
 
@@ -39,7 +39,7 @@ export class FakeDb {
 }
 
 class Query implements PromiseLike<{ data: unknown; error: null }> {
-  private op: 'select' | 'insert' | 'update' = 'select';
+  private op: 'select' | 'insert' | 'update' | 'upsert' = 'select';
   private filters: Filter[] = [];
   private values: Row | Row[] = {};
   private orderCol: string | null = null;
@@ -53,6 +53,12 @@ class Query implements PromiseLike<{ data: unknown; error: null }> {
   }
   insert(values: Row | Row[]) {
     this.op = 'insert';
+    this.values = values;
+    return this;
+  }
+  /** Only `{ ignoreDuplicates: true }` on the id: an existing id is skipped */
+  upsert(values: Row | Row[]) {
+    this.op = 'upsert';
     this.values = values;
     return this;
   }
@@ -103,6 +109,12 @@ class Query implements PromiseLike<{ data: unknown; error: null }> {
 
   private run(): Row[] {
     const rows = (this.db.tables[this.table] ??= []);
+    if (this.op === 'upsert') {
+      const fresh = (Array.isArray(this.values) ? this.values : [this.values]).filter(
+        (v) => !rows.some((r) => r.id === v.id)
+      );
+      return this.db.insertRows(this.table, fresh);
+    }
     if (this.op === 'insert') {
       return this.db.insertRows(this.table, Array.isArray(this.values) ? this.values : [this.values]);
     }

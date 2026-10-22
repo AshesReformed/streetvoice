@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendSms } from '@/lib/sms/notify';
 import { sms } from '@/lib/sms/messages';
@@ -17,6 +18,12 @@ import { normalizeArea } from '@/lib/pipeline/duplicates';
 // A new alert shows as a red banner on every control-room page and is
 // texted to ALERT_SMS_NUMBERS (comma-separated). While an alert of the same
 // kind and key is open (2 hours), it isn't raised again.
+//
+// Many calls can raise the same alert in the same instant (a flood is many
+// calls), so a check-then-insert alone would let all of them through. Each
+// alert gets an id made from its kind, key, 2-hour window and how many of
+// its kind were dismissed in that window: callers racing to raise the same
+// alert compute the same id, and the database keeps only the first.
 // ===========================================================================
 
 const MINUTE = 60_000;
@@ -47,6 +54,39 @@ export function alertNumbers(): string[] {
 
 const since = (ms: number) => new Date(Date.now() - ms).toISOString();
 
+/** A uuid-shaped id that is the same for everyone raising this alert now */
+export function alertId(kind: string, dedupeKey: string, dismissed: number, now = Date.now()): string {
+  const h = createHash('sha256')
+    .update(`${kind}:${dedupeKey}:${Math.floor(now / DEDUPE_MS)}:${dismissed}`)
+    .digest('hex');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20, 32)}`;
+}
+
+/** Insert the alert unless the same one is open. Returns true if this call added it. */
+async function insertOnce(
+  kind: AlertKind,
+  dedupeKey: string,
+  message: string,
+  details: Record<string, unknown>
+): Promise<boolean> {
+  const supabase = createAdminClient();
+  const { data: recent } = await supabase
+    .from('system_alerts')
+    .select('id, resolved_at')
+    .eq('kind', kind)
+    .eq('dedupe_key', dedupeKey)
+    .gte('created_at', since(DEDUPE_MS))
+    .limit(50);
+  if ((recent ?? []).some((a) => !a.resolved_at)) return false;
+
+  const id = alertId(kind, dedupeKey, (recent ?? []).length);
+  const { data: inserted } = await supabase
+    .from('system_alerts')
+    .upsert({ id, kind, dedupe_key: dedupeKey, message, details }, { onConflict: 'id', ignoreDuplicates: true })
+    .select('id');
+  return (inserted ?? []).length > 0;
+}
+
 /** Raise an alert unless the same one is already open. Returns true if new. */
 export async function raiseAlert(
   kind: AlertKind,
@@ -54,17 +94,7 @@ export async function raiseAlert(
   message: string,
   details: Record<string, unknown> = {}
 ): Promise<boolean> {
-  const supabase = createAdminClient();
-  const { data: open } = await supabase
-    .from('system_alerts')
-    .select('id, resolved_at')
-    .eq('kind', kind)
-    .eq('dedupe_key', dedupeKey)
-    .gte('created_at', since(DEDUPE_MS))
-    .limit(5);
-  if ((open ?? []).some((a) => !a.resolved_at)) return false;
-
-  await supabase.from('system_alerts').insert({ kind, dedupe_key: dedupeKey, message, details });
+  if (!(await insertOnce(kind, dedupeKey, message, details))) return false;
   for (const to of alertNumbers()) {
     await sendSms({ to, body: sms.adminAlert(message), purpose: 'admin_alert' });
   }
@@ -169,8 +199,7 @@ async function checkAiBacklog(): Promise<boolean> {
 }
 
 async function checkSms(): Promise<boolean> {
-  const supabase = createAdminClient();
-  const { data: failed } = await supabase
+  const { data: failed } = await createAdminClient()
     .from('sms_messages')
     .select('id')
     .eq('direction', 'out')
@@ -180,20 +209,12 @@ async function checkSms(): Promise<boolean> {
   const failures = failed?.length ?? 0;
   if (failures < THRESHOLDS.smsFailuresPer30Min()) return false;
   // Not texted: SMS is what's broken. The banner still shows.
-  const { data: open } = await supabase
-    .from('system_alerts')
-    .select('id, resolved_at')
-    .eq('kind', 'sms_failing')
-    .gte('created_at', since(DEDUPE_MS))
-    .limit(5);
-  if ((open ?? []).some((a) => !a.resolved_at)) return false;
-  await supabase.from('system_alerts').insert({
-    kind: 'sms_failing',
-    dedupe_key: 'sms',
-    message: `${failures} SMS failed in the last 30 minutes. Check the SMS phone is on, online and has balance.`,
-    details: { failures },
-  });
-  return true;
+  return insertOnce(
+    'sms_failing',
+    'sms',
+    `${failures} SMS failed in the last 30 minutes. Check the SMS phone is on, online and has balance.`,
+    { failures }
+  );
 }
 
 /** Every check; run from the 5-minute cron. Returns how many alerts were raised. */

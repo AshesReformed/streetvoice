@@ -138,6 +138,17 @@ describe('alarms', () => {
     expect(vi.mocked(sendSms).mock.calls[0][0]).toMatchObject({ to: '+923001112222', purpose: 'admin_alert' });
   });
 
+  it('raises one alert when many calls check at the same instant', async () => {
+    for (let i = 0; i < 30; i++) {
+      db.insertRows('call_attempts', [{ caller_key: `k${i}`, key_kind: 'phone', outcome: 'accepted' }]);
+    }
+    // All 30 read "no open alert" before any of them inserts
+    const results = await Promise.all(Array.from({ length: 30 }, () => checkFlood()));
+    expect(results.filter(Boolean)).toHaveLength(1);
+    expect(db.tables.system_alerts).toHaveLength(1);
+    expect(sendSms).toHaveBeenCalledTimes(1);
+  });
+
   it('stays quiet below the threshold', async () => {
     db.insertRows('call_attempts', [{ caller_key: 'k', key_kind: 'phone', outcome: 'accepted' }]);
     expect(await checkFlood()).toBe(false);
